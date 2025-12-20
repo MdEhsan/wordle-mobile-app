@@ -1,4 +1,5 @@
 export type OutlinedButtonProps = {
   title: string;
-  onPress: () => void;
+  onPress?: () => void;
+  isLoading?: boolean;
 };

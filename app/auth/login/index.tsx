@@ -1,42 +1,201 @@
+import useAuth from "@/auth-protect/useAuth";
 import OutlinedButton from "@/components/buttons/outlined";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { labels } from "@/constants/label";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import React, { useState } from "react";
+import { ENDPOINTS } from "@/service/endpoints";
+import { usePost } from "@/service/hooks/useMutation";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  Modal,
   Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { LOGIN_LABEL } from "../label";
+import { LocalModal } from "../modal";
+import { UsernameModal } from "../username-modal";
 
 export default function LoginPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpMethod, setOtpMethod] = useState<"whatsapp" | "sms">("sms");
   const [errorMessage, setErrorMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [mobileNumberFromApi, setMobileNumberFromApi] = useState("");
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
+  const [pendingAuthData, setPendingAuthData] = useState<{
+    token: string;
+    user: any;
+  } | null>(null);
+  const auth = useAuth();
+  const router = useRouter();
 
-  const handleGenerateOTP = () => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (auth.isAuthenticated && !auth.isLoading) {
+      router.replace("/game");
+    }
+  }, [auth.isAuthenticated, auth.isLoading]);
+
+  const { mutate: sendOtp, loading: sendingOtp } = usePost(
+    ENDPOINTS.AUTH.SEND_OTP,
+    {
+      onSuccess: (data) => {
+        if (data?.mobile) {
+          setMobileNumberFromApi(data.mobile);
+        }
+        setOtpSent(true);
+        setShowSuccessModal(true);
+      },
+      onError: (error) => {
+        setErrorMessage(
+          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SEND
+        );
+      },
+    }
+  );
+
+  const { mutate: loginWithOtp, loading: verifyingOtp } = usePost(
+    ENDPOINTS.AUTH.LOGIN,
+    {
+      onSuccess: async (data) => {
+        if (data?.token) {
+          // Check if username exists
+          if (!data.user?.username) {
+            // Show username modal
+            setPendingAuthData({
+              token: data.token,
+              user: data.user || { phone: phoneNumber },
+            });
+            setShowSuccessModal(false);
+            setShowUsernameModal(true);
+          } else {
+            // Username exists, proceed with login
+            try {
+              await auth.login(data.token, data.user || { phone: phoneNumber });
+              router.replace("/game");
+            } catch (error) {
+              setErrorMessage(
+                LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN
+              );
+            }
+          }
+        } else {
+          setErrorMessage(LOGIN_LABEL.INVALID_RESPONSE);
+        }
+      },
+      onError: (error) => {
+        setErrorMessage(
+          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.INVALID_OTP
+        );
+      },
+    }
+  );
+
+  const { mutate: resendOtp, loading: resendingOtp } = usePost(
+    ENDPOINTS.AUTH.REGENERATE_OTP,
+    {
+      onSuccess: (data) => {
+        if (data?.mobile) {
+          setMobileNumberFromApi(data.mobile);
+        }
+      },
+      onError: (error) => {
+        setErrorMessage(
+          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_RESEND
+        );
+      },
+    }
+  );
+
+  const { mutate: createUsername, loading: creatingUsername } = usePost(
+    ENDPOINTS.AUTH.CREATE_USERNAME,
+    {
+      onSuccess: async (data) => {
+        // Now save the auth data and navigate
+        if (pendingAuthData) {
+          try {
+            await auth.login(
+              pendingAuthData.token,
+              data.user || pendingAuthData.user
+            );
+            setShowUsernameModal(false);
+            router.replace("/game");
+          } catch (error) {
+            setUsernameError(
+              LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN
+            );
+          }
+        }
+      },
+      onError: (error) => {
+        setUsernameError(
+          error.message ||
+            LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_CREATE_USERNAME
+        );
+      },
+    }
+  );
+
+  const handleGenerateOTP = async () => {
     if (phoneNumber.trim()) {
       setErrorMessage("");
-      setShowSuccessModal(true);
-      // Add your OTP generation logic here
-      setTimeout(() => {
-        setShowSuccessModal(false);
-      }, 3000);
+      await sendOtp({
+        mobile: `+91${phoneNumber.trim()}`,
+        useWhatsApp: otpMethod === "whatsapp",
+      });
     } else {
-      setErrorMessage("Please enter a phone number");
+      setErrorMessage(LOGIN_LABEL.ERROR_MESSAGE.ENTER_PHONE_NUMBER);
     }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp.trim()) {
+      setErrorMessage("Please enter the OTP");
+      return;
+    }
+
+    if (otp.trim().length !== 6) {
+      setErrorMessage(LOGIN_LABEL.ERROR_MESSAGE.VALID_OTP);
+      return;
+    }
+
+    await loginWithOtp({
+      mobile: mobileNumberFromApi || `+91${phoneNumber.trim()}`,
+      otp: otp.trim(),
+    });
+  };
+
+  const handleResendOtp = async () => {
+    if (phoneNumber.trim()) {
+      setErrorMessage("");
+      setOtp("");
+
+      await resendOtp({
+        mobile: mobileNumberFromApi || `+91${phoneNumber.trim()}`,
+        useWhatsApp: otpMethod === "whatsapp",
+      });
+    }
+  };
+
+  const handleCreateUsername = async (username: string) => {
+    setUsernameError("");
+    await createUsername({ username });
   };
 
   return (
     <ThemedView style={styles.container}>
       <View>
-        <ThemedText style={styles.title} type="title">
+        <ThemedText
+          style={[styles.title, { fontFamily: "FrankRuhlLibre_700Bold" }]}
+          type="title"
+        >
           {labels.LOGIN.TITLE}
         </ThemedText>
       </View>
@@ -62,7 +221,10 @@ export default function LoginPage() {
         ) : null}
 
         <View style={styles.otpMethodContainer}>
-          <ThemedText style={styles.label} type="default">
+          <ThemedText
+            style={[styles.label, { fontFamily: "FrankRuhlLibre_500Medium" }]}
+            type="default"
+          >
             {labels.LOGIN.RECEIVE_OTP_VIA_LABEL}
           </ThemedText>
 
@@ -76,7 +238,12 @@ export default function LoginPage() {
                   <View style={styles.radioCircleSelected} />
                 )}
               </View>
-              <ThemedText style={styles.radioLabel}>
+              <ThemedText
+                style={[
+                  styles.radioLabel,
+                  { fontFamily: "FrankRuhlLibre_500Medium" },
+                ]}
+              >
                 {labels.LOGIN.SMS_OPTION}
               </ThemedText>
             </TouchableOpacity>
@@ -90,7 +257,12 @@ export default function LoginPage() {
                   <View style={styles.radioCircleSelected} />
                 )}
               </View>
-              <ThemedText style={styles.radioLabel}>
+              <ThemedText
+                style={[
+                  styles.radioLabel,
+                  { fontFamily: "FrankRuhlLibre_500Medium" },
+                ]}
+              >
                 {labels.LOGIN.WHATSAPP_OPTION}
               </ThemedText>
             </TouchableOpacity>
@@ -98,36 +270,40 @@ export default function LoginPage() {
         </View>
 
         <View style={styles.buttonContainer}>
-          <OutlinedButton title="Generate OTP" onPress={handleGenerateOTP} />
+          <OutlinedButton
+            title={LOGIN_LABEL.BUTTON_LABEL.GENERATE_OTP}
+            onPress={handleGenerateOTP}
+            isLoading={sendingOtp}
+          />
         </View>
       </View>
 
       {/* Success Modal */}
       {showSuccessModal && (
-        <Modal
-          transparent={true}
-          visible={showSuccessModal}
-          animationType="fade"
-          onRequestClose={() => setShowSuccessModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.checkmarkCircle}>
-                <MaterialCommunityIcons
-                  name="check-bold"
-                  size={24}
-                  color="white"
-                />
-              </View>
-              <ThemedText style={styles.modalTitle}>Success!</ThemedText>
-              <ThemedText style={styles.modalMessage}>
-                OTP will be sent to {phoneNumber} via{" "}
-                {otpMethod === "whatsapp" ? "WhatsApp" : "SMS"}
-              </ThemedText>
-            </View>
-          </View>
-        </Modal>
+        <LocalModal
+          showSuccessModal={showSuccessModal}
+          setShowSuccessModal={setShowSuccessModal}
+          phoneNumber={phoneNumber}
+          otpMethod={otpMethod}
+          otpSent={otpSent}
+          otp={otp}
+          setOtp={setOtp}
+          errorMessage={errorMessage}
+          setErrorMessage={setErrorMessage}
+          handleVerifyOtp={handleVerifyOtp}
+          handleResendOtp={handleResendOtp}
+          isVerifying={verifyingOtp}
+          isResending={resendingOtp}
+        />
       )}
+
+      {/* Username Modal */}
+      <UsernameModal
+        visible={showUsernameModal}
+        onSubmit={handleCreateUsername}
+        isLoading={creatingUsername}
+        errorMessage={usernameError}
+      />
     </ThemedView>
   );
 }
@@ -142,10 +318,11 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 48,
-    lineHeight: 56,
+    lineHeight: 60,
     marginBottom: 4,
     paddingVertical: 4,
     color: "#2E7D32",
+    textAlign: "center",
   },
   formContainer: {
     width: "100%",
@@ -181,6 +358,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     marginBottom: 8,
     color: "#1B5E20",
+    fontFamily: "FrankRuhlLibre_500Medium",
   },
   inputError: {
     borderColor: "#F44336",
@@ -226,56 +404,5 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginTop: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 30,
-    alignItems: "center",
-    width: "80%",
-    maxWidth: 350,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-      },
-      android: {
-        elevation: 12,
-      },
-    }),
-  },
-  checkmarkCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#43A047",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  checkmark: {
-    fontSize: 50,
-    color: "#FFFFFF",
-    fontWeight: "bold",
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#2E7D32",
-    marginBottom: 12,
-  },
-  modalMessage: {
-    fontSize: 16,
-    color: "#388E3C",
-    textAlign: "center",
-    lineHeight: 24,
   },
 });

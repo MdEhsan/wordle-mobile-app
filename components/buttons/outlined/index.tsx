@@ -1,11 +1,24 @@
 import { ThemedText } from "@/components/themed-text";
-import { Pressable, StyleSheet } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
 import { OutlinedButtonProps } from "../types";
 
-export default function OutlinedButton({ title, onPress }: OutlinedButtonProps) {
+export default function OutlinedButton({
+  title,
+  onPress,
+  isLoading = false,
+}: OutlinedButtonProps) {
   return (
-    <Pressable style={styles.button} onPress={onPress}>
-      <ThemedText style={{color: "#1B5E20"}} type="defaultSemiBold">{title}</ThemedText>
+    <Pressable style={styles.button} onPress={onPress} disabled={isLoading}>
+      {isLoading ? (
+        <ActivityIndicator color="#1B5E20" />
+      ) : (
+        <ThemedText
+          style={{ color: "#1B5E20", fontFamily: "FrankRuhlLibre_500Medium" }}
+          type="defaultSemiBold"
+        >
+          {title}
+        </ThemedText>
+      )}
     </Pressable>
   );
 }
