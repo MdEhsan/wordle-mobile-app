@@ -211,7 +211,6 @@ export default function LoginPage() {
             if (errorMessage) setErrorMessage("");
           }}
           keyboardType="phone-pad"
-          maxLength={10}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
         />
