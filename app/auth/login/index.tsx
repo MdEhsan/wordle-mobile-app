@@ -147,7 +147,7 @@ export default function LoginPage() {
     if (phoneNumber.trim()) {
       setErrorMessage("");
       await sendOtp({
-        mobile: `+91${phoneNumber.trim()}`,
+        mobile: `${phoneNumber.trim()}`,
         useWhatsApp: otpMethod === "whatsapp",
       });
     } else {
@@ -167,7 +167,7 @@ export default function LoginPage() {
     }
 
     await loginWithOtp({
-      mobile: mobileNumberFromApi || `+91${phoneNumber.trim()}`,
+      mobile: mobileNumberFromApi || `${phoneNumber.trim()}`,
       otp: otp.trim(),
     });
   };
@@ -178,7 +178,7 @@ export default function LoginPage() {
       setOtp("");
 
       await resendOtp({
-        mobile: mobileNumberFromApi || `+91${phoneNumber.trim()}`,
+        mobile: mobileNumberFromApi || `${phoneNumber.trim()}`,
         useWhatsApp: otpMethod === "whatsapp",
       });
     }
