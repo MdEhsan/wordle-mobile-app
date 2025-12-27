@@ -277,7 +277,6 @@ export default function LoginPage() {
         </View>
       </View>
 
-      {/* Success Modal */}
       {showSuccessModal && (
         <LocalModal
           showSuccessModal={showSuccessModal}
@@ -296,7 +295,6 @@ export default function LoginPage() {
         />
       )}
 
-      {/* Username Modal */}
       <UsernameModal
         visible={showUsernameModal}
         onSubmit={handleCreateUsername}

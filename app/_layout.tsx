@@ -46,6 +46,12 @@ export const RootLayout = () => {
             }}
           />
           <Stack.Screen
+            name="auth"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="game"
             options={{
               headerBackTitle: "Wordle",

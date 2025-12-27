@@ -4,13 +4,17 @@ import OnScreenKeyboard, {
   ENTER,
 } from "@/components/onScreenkeyboard";
 import { Colors } from "@/constants/Color";
+import { ENDPOINTS } from "@/service/endpoints";
+import { useFetch } from "@/service/hooks/useFetch";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   StyleSheet,
+  Text,
   TouchableOpacity,
   useColorScheme,
   View,
@@ -36,30 +40,49 @@ const allWords = [
   "flame",
   "grape",
 ];
-const words = "apple";
+
+interface DailyWordResponse {
+  success: boolean;
+  data: {
+    _id: string;
+    dataIndex: number;
+    word: string;
+  };
+}
 
 const Page = () => {
-  const [word, setWord] = useState(
-    words[Math.floor(Math.random() * words.length)]
-  );
   const colorScheme = useColorScheme();
   const backgroundColor = Colors[colorScheme ?? "light"].gameBg;
   const textColor = Colors[colorScheme ?? "light"].text;
   const grayColor = Colors[colorScheme ?? "light"].gray;
 
-  // const [word, setWord] = useState('simon');
   const router = useRouter();
   const auth = useAuth();
 
-  // redirect to login if not authenticated
+  const {
+    data: dailyWordData,
+    loading: loadingWord,
+    error: wordError,
+  } = useFetch<DailyWordResponse>(ENDPOINTS.WORDLE.GET_DAILY_WORD);
+
+  const [word, setWord] = useState<string>("");
+
+  // Redirect to login if not authenticated (after loading completes)
   useEffect(() => {
-    if (!auth.isAuthenticated) {
+    if (!auth.isLoading && !auth.isAuthenticated) {
       router.replace("/auth/login");
     }
-  }, [auth.isAuthenticated]);
+  }, [auth.isAuthenticated, auth.isLoading]);
 
-  console.log("🚀 ~ Page ~ word:", word);
-  const wordLetters = word.split("");
+  console.log("DAILY WORD DATA: ", dailyWordData);
+
+  useEffect(() => {
+    if (dailyWordData?.success && dailyWordData?.data?.word) {
+      setWord(dailyWordData?.data?.word.toLowerCase());
+    }
+  }, [dailyWordData]);
+
+  const wordLetters = word ? word.split("") : [];
 
   const [rows, setRows] = useState<string[][]>(
     new Array(ROWS).fill(new Array(5).fill(""))
@@ -84,6 +107,9 @@ const Page = () => {
 
   const addKey = (key: string) => {
     console.log("CURRENT: ", colStateRef.current);
+    if (!word || loadingWord) {
+      return;
+    }
 
     const newRows = [...rows.map((row) => [...row])];
 
@@ -102,7 +128,6 @@ const Page = () => {
       setRows(newRows);
       return;
     } else if (colStateRef.current >= newRows[curRow].length) {
-      // EoL don't add keys
     } else {
       console.log("🚀 ~ addKey ~ curCol", colStateRef.current);
 
@@ -115,13 +140,17 @@ const Page = () => {
   const checkWord = () => {
     const currentWord = rows[curRow].join("");
 
+    if (!word || word.length === 0) {
+      console.log("Word not loaded yet");
+      return;
+    }
+
     if (currentWord.length < word.length) {
       shakeRow();
       return;
     }
 
     if (!allWords.includes(currentWord)) {
-      console.log("NOT A WORD");
       shakeRow();
       return;
     }
@@ -208,7 +237,7 @@ const Page = () => {
 
   // Animations
   const setCellColor = (cell: string, rowIndex: number, cellIndex: number) => {
-    if (curRow >= rowIndex) {
+    if (curRow >= rowIndex && wordLetters.length > 0) {
       if (wordLetters[cellIndex] === cell) {
         cellBackgrounds[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
@@ -237,7 +266,7 @@ const Page = () => {
     rowIndex: number,
     cellIndex: number
   ) => {
-    if (curRow > rowIndex && cell !== "") {
+    if (curRow > rowIndex && cell !== "" && wordLetters.length > 0) {
       if (wordLetters[cellIndex] === cell) {
         cellBorders[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
@@ -331,6 +360,8 @@ const Page = () => {
     <View style={[styles.container, { backgroundColor }]}>
       <Stack.Screen
         options={{
+          title: "",
+          headerShown: false,
           headerRight: () => (
             <View style={styles.headerIcons}>
               <Ionicons
@@ -346,49 +377,78 @@ const Page = () => {
           ),
         }}
       />
-      <View style={styles.gameField}>
-        {rows.map((row, rowIndex) => (
-          <Animated.View
-            style={[styles.gameFieldRow, rowStyles[rowIndex]]}
-            key={`row-${rowIndex}`}
-          >
-            {row.map((cell, cellIndex) => (
+
+      {/* Loading State */}
+      {loadingWord && (
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={textColor} />
+          <Text style={[styles.statusText, { color: textColor }]}>
+            Loading today's word...
+          </Text>
+        </View>
+      )}
+
+      {/* Error State */}
+      {wordError && !loadingWord && (
+        <View style={styles.centerContent}>
+          <Ionicons name="alert-circle-outline" size={48} color="red" />
+          <Text style={[styles.statusText, { color: textColor }]}>
+            Failed to load today's word
+          </Text>
+          <Text style={[styles.errorText, { color: grayColor }]}>
+            {wordError.message}
+          </Text>
+        </View>
+      )}
+
+      {/* Game Content */}
+      {!loadingWord && !wordError && word && (
+        <>
+          <View style={styles.gameField}>
+            {rows.map((row, rowIndex) => (
               <Animated.View
-                entering={ZoomIn.delay(50 * cellIndex)}
-                key={`cell-${rowIndex}-${cellIndex}`}
+                style={[styles.gameFieldRow, rowStyles[rowIndex]]}
+                key={`row-${rowIndex}`}
               >
-                <Animated.View
-                  style={[
-                    styles.cell,
-                    // {
-                    //   borderColor: getBorderColor(cell, rowIndex, cellIndex),
-                    //   backgroundColor: getCellColor(cell, rowIndex, cellIndex),
-                    // },
-                    tileStyles[rowIndex][cellIndex],
-                  ]}
-                >
-                  <Animated.Text
-                    style={[
-                      styles.cellText,
-                      {
-                        color: curRow > rowIndex ? "#fff" : textColor,
-                      },
-                    ]}
+                {row.map((cell, cellIndex) => (
+                  <Animated.View
+                    entering={ZoomIn.delay(50 * cellIndex)}
+                    key={`cell-${rowIndex}-${cellIndex}`}
                   >
-                    {cell}
-                  </Animated.Text>
-                </Animated.View>
+                    <Animated.View
+                      style={[
+                        styles.cell,
+                        // {
+                        //   borderColor: getBorderColor(cell, rowIndex, cellIndex),
+                        //   backgroundColor: getCellColor(cell, rowIndex, cellIndex),
+                        // },
+                        tileStyles[rowIndex][cellIndex],
+                      ]}
+                    >
+                      <Animated.Text
+                        style={[
+                          styles.cellText,
+                          {
+                            color: curRow > rowIndex ? "#fff" : textColor,
+                          },
+                        ]}
+                      >
+                        {cell}
+                      </Animated.Text>
+                    </Animated.View>
+                  </Animated.View>
+                ))}
               </Animated.View>
             ))}
-          </Animated.View>
-        ))}
-      </View>
-      <OnScreenKeyboard
-        onKeyPressed={addKey}
-        greenLetters={greenLetters}
-        yellowLetters={yellowLetters}
-        grayLetters={grayLetters}
-      />
+          </View>
+          <OnScreenKeyboard
+            onKeyPressed={addKey}
+            greenLetters={greenLetters}
+            yellowLetters={yellowLetters}
+            grayLetters={grayLetters}
+          />
+        </>
+      )}
     </View>
   );
 };
@@ -423,5 +483,21 @@ const styles = StyleSheet.create({
   headerIcons: {
     flexDirection: "row",
     gap: 10,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  statusText: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 20,
   },
 });
