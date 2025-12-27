@@ -197,7 +197,6 @@ const Page = () => {
           excitingMessages[Math.floor(Math.random() * excitingMessages.length)];
         setSuccessMessage(randomMessage);
         setShowSuccessModal(true);
-        console.log("🚀 ~ checkWord ~ WIN");
       } else if (curRow + 1 >= rows.length) {
         console.log("GAME OVER");
       }
