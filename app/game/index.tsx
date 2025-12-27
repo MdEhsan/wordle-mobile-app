@@ -152,7 +152,6 @@ const Page = () => {
       const validationResult = await validateWord({ word: currentWord });
 
       if (!validationResult?.isValid) {
-        console.log("NOT A VALID WORD");
         shakeRow();
         return;
       }
