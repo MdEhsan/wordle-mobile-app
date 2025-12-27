@@ -6,12 +6,14 @@ import OnScreenKeyboard, {
 import { Colors } from "@/constants/Color";
 import { ENDPOINTS } from "@/service/endpoints";
 import { useFetch } from "@/service/hooks/useFetch";
+import { useMutation } from "@/service/hooks/useMutation";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -28,6 +30,11 @@ import Animated, {
   withTiming,
   ZoomIn,
 } from "react-native-reanimated";
+import {
+  DailyWordResponse,
+  ValidateWordRequest,
+  ValidateWordResponse,
+} from "./types";
 
 const ROWS = 6;
 
@@ -41,48 +48,11 @@ const allWords = [
   "grape",
 ];
 
-interface DailyWordResponse {
-  success: boolean;
-  data: {
-    _id: string;
-    dataIndex: number;
-    word: string;
-  };
-}
-
 const Page = () => {
   const colorScheme = useColorScheme();
   const backgroundColor = Colors[colorScheme ?? "light"].gameBg;
   const textColor = Colors[colorScheme ?? "light"].text;
   const grayColor = Colors[colorScheme ?? "light"].gray;
-
-  const router = useRouter();
-  const auth = useAuth();
-
-  const {
-    data: dailyWordData,
-    loading: loadingWord,
-    error: wordError,
-  } = useFetch<DailyWordResponse>(ENDPOINTS.WORDLE.GET_DAILY_WORD);
-
-  const [word, setWord] = useState<string>("");
-
-  // Redirect to login if not authenticated (after loading completes)
-  useEffect(() => {
-    if (!auth.isLoading && !auth.isAuthenticated) {
-      router.replace("/auth/login");
-    }
-  }, [auth.isAuthenticated, auth.isLoading]);
-
-  console.log("DAILY WORD DATA: ", dailyWordData);
-
-  useEffect(() => {
-    if (dailyWordData?.success && dailyWordData?.data?.word) {
-      setWord(dailyWordData?.data?.word.toLowerCase());
-    }
-  }, [dailyWordData]);
-
-  const wordLetters = word ? word.split("") : [];
 
   const [rows, setRows] = useState<string[][]>(
     new Array(ROWS).fill(new Array(5).fill(""))
@@ -93,20 +63,51 @@ const Page = () => {
   const [greenLetters, setGreenLetters] = useState<string[]>([]);
   const [yellowLetters, setYellowLetters] = useState<string[]>([]);
   const [grayLetters, setGrayLetters] = useState<string[]>([]);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [word, setWord] = useState<string>("");
 
   const settingsModalRef = useRef<BottomSheetModal>(null);
+  const colStateRef = useRef(curCol);
+
+  const router = useRouter();
+  const auth = useAuth();
+
+  const {
+    data: dailyWordData,
+    loading: loadingWord,
+    error: wordError,
+  } = useFetch<DailyWordResponse>(ENDPOINTS.WORDLE.GET_DAILY_WORD);
+
+  const { mutate: validateWord, loading: validatingWord } = useMutation<
+    ValidateWordResponse,
+    ValidateWordRequest
+  >("post", ENDPOINTS.WORDLE.VALIDATE_WORD);
+
+  // Redirect to login if not authenticated (after loading completes)
+  useEffect(() => {
+    if (!auth.isLoading && !auth.isAuthenticated) {
+      router.replace("/auth/login");
+    }
+  }, [auth.isAuthenticated, auth.isLoading]);
+
+  useEffect(() => {
+    if (dailyWordData?.success && dailyWordData?.data?.word) {
+      setWord(dailyWordData?.data?.word.toLowerCase());
+    }
+  }, [dailyWordData]);
+
+  const wordLetters = word ? word.split("") : [];
 
   const handlePresentSubscribeModalPress = () =>
     settingsModalRef.current?.present();
 
-  const colStateRef = useRef(curCol);
   const setCurCol = (data: number) => {
     colStateRef.current = data;
     _setCurCol(data);
   };
 
   const addKey = (key: string) => {
-    console.log("CURRENT: ", colStateRef.current);
     if (!word || loadingWord) {
       return;
     }
@@ -129,19 +130,16 @@ const Page = () => {
       return;
     } else if (colStateRef.current >= newRows[curRow].length) {
     } else {
-      console.log("🚀 ~ addKey ~ curCol", colStateRef.current);
-
       newRows[curRow][colStateRef.current] = key;
       setRows(newRows);
       setCurCol(colStateRef.current + 1);
     }
   };
 
-  const checkWord = () => {
+  const checkWord = async () => {
     const currentWord = rows[curRow].join("");
 
     if (!word || word.length === 0) {
-      console.log("Word not loaded yet");
       return;
     }
 
@@ -150,10 +148,21 @@ const Page = () => {
       return;
     }
 
-    if (!allWords.includes(currentWord)) {
-      shakeRow();
-      return;
+    try {
+      const validationResult = await validateWord({ word: currentWord });
+
+      if (!validationResult?.isValid) {
+        console.log("NOT A VALID WORD");
+        shakeRow();
+        return;
+      }
+    } catch (error) {
+      if (!allWords.includes(currentWord)) {
+        shakeRow();
+        return;
+      }
     }
+
     flipRow();
 
     const newGreen: string[] = [];
@@ -176,15 +185,21 @@ const Page = () => {
 
     setTimeout(() => {
       if (currentWord === word) {
+        const excitingMessages = [
+          "🎉 Genius! You nailed it!",
+          "🌟 Spectacular! You're a word wizard!",
+          "🏆 Amazing! Perfect guess!",
+          "💫 Brilliant! You've got the magic touch!",
+          "🎊 Outstanding! You're on fire!",
+          "✨ Phenomenal! You're a Wordle champion!",
+        ];
+        const randomMessage =
+          excitingMessages[Math.floor(Math.random() * excitingMessages.length)];
+        setSuccessMessage(randomMessage);
+        setShowSuccessModal(true);
         console.log("🚀 ~ checkWord ~ WIN");
-        // router.push(
-        //   `/end?win=true&word=${word}&gameField=${JSON.stringify(rows)}`
-        // );
       } else if (curRow + 1 >= rows.length) {
         console.log("GAME OVER");
-        // router.push(
-        //   `/end?win=false&word=${word}&gameField=${JSON.stringify(rows)}`
-        // );
       }
     }, 1500);
     setCurRow(curRow + 1);
@@ -206,7 +221,6 @@ const Page = () => {
       document.addEventListener("keydown", handleKeyDown);
     }
 
-    // Don't forget to clean up
     return () => {
       if (Platform.OS === "web") {
         document.removeEventListener("keydown", handleKeyDown);
@@ -449,6 +463,37 @@ const Page = () => {
           />
         </>
       )}
+
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[styles.modalContent, { backgroundColor }]}
+            entering={ZoomIn.duration(300)}
+          >
+            <Text style={styles.successEmoji}>🎉</Text>
+            <Text style={[styles.successTitle, { color: textColor }]}>
+              Congratulations!
+            </Text>
+            <Text style={[styles.successMessage, { color: textColor }]}>
+              {successMessage}
+            </Text>
+            <Text style={[styles.wordReveal, { color: Colors.light.green }]}>
+              {`The word was: ${word.toUpperCase()}`}
+            </Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowSuccessModal(false)}
+            >
+              <Text style={styles.closeButtonText}>Awesome!</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -499,5 +544,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     paddingHorizontal: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "85%",
+    padding: 32,
+    borderRadius: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  successEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  successMessage: {
+    fontSize: 18,
+    textAlign: "center",
+    marginBottom: 16,
+    fontWeight: "600",
+  },
+  wordReveal: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 24,
+    letterSpacing: 2,
+  },
+  closeButton: {
+    backgroundColor: Colors.light.green,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 25,
+    minWidth: 150,
+    alignItems: "center",
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });
