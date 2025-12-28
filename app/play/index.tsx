@@ -1,3 +1,4 @@
+import useAuth from "@/auth-protect/useAuth";
 import { Colors } from "@/constants/Color";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
@@ -15,6 +16,12 @@ export default function PlayPage() {
   const colorScheme = useColorScheme();
   const backgroundColor = Colors[colorScheme ?? "light"].gameBg;
   const textColor = Colors[colorScheme ?? "light"].text;
+  const auth = useAuth();
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.replace("/auth/login");
+  };
 
   return (
     <View style={[styles.container, { backgroundColor }]}>
@@ -24,6 +31,10 @@ export default function PlayPage() {
           headerShown: false,
         }}
       />
+
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Ionicons name="log-out-outline" size={24} color={textColor} />
+      </TouchableOpacity>
 
       <View style={styles.content}>
         <Text style={[styles.title, { color: textColor }]}>Wordle</Text>
@@ -55,6 +66,13 @@ export default function PlayPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  logoutButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 100,
+    padding: 8,
   },
   content: {
     flex: 1,

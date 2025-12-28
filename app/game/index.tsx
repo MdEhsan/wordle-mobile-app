@@ -73,6 +73,11 @@ const Page = () => {
   const router = useRouter();
   const auth = useAuth();
 
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.replace("/auth/login");
+  };
+
   const {
     data: dailyWordData,
     loading: loadingWord,
@@ -384,6 +389,14 @@ const Page = () => {
         <Ionicons name="arrow-back" size={28} color={textColor} />
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={handleLogout}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="log-out-outline" size={24} color={textColor} />
+      </TouchableOpacity>
+
       {loadingWord && (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={textColor} />
@@ -502,6 +515,12 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 50,
     left: 20,
+    zIndex: 100,
+  },
+  logoutButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
     zIndex: 100,
   },
   gameField: {
