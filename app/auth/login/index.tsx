@@ -39,7 +39,7 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (auth.isAuthenticated && !auth.isLoading) {
-      router.replace("/game");
+      router.replace("/play");
     }
   }, [auth.isAuthenticated, auth.isLoading]);
 
@@ -79,7 +79,7 @@ export default function LoginPage() {
             // Username exists, proceed with login
             try {
               await auth.login(data.token, data.user || { phone: phoneNumber });
-              router.replace("/game");
+              router.replace("/play");
             } catch (error) {
               setErrorMessage(
                 LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN
@@ -126,7 +126,7 @@ export default function LoginPage() {
               data.user || pendingAuthData.user
             );
             setShowUsernameModal(false);
-            router.replace("/game");
+            router.replace("/play");
           } catch (error) {
             setUsernameError(
               LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN

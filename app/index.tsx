@@ -1,7 +1,7 @@
+import useAuth from "@/auth-protect/useAuth";
+import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
 import LandingPage from "./page/landing-page";
-import useAuth from '@/auth-protect/useAuth';
-import { useRouter } from 'expo-router';
 
 export default function Index() {
   const auth = useAuth();
@@ -9,10 +9,10 @@ export default function Index() {
 
   useEffect(() => {
     if (!auth.isAuthenticated) {
-      router.replace('/auth/login');
+      router.replace("/auth/login");
     } else {
-      // If authenticated, send to game by default
-      router.replace('/game');
+      // If authenticated, send to play by default
+      router.replace("/play");
     }
   }, [auth.isAuthenticated]);
 

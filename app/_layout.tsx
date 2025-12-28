@@ -52,6 +52,12 @@ export const RootLayout = () => {
             }}
           />
           <Stack.Screen
+            name="play"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="game"
             options={{
               headerBackTitle: "Wordle",
@@ -99,8 +105,8 @@ const AuthGate: React.FC = () => {
     }
 
     if (onAuth && onAuthRoutes) {
-      // Authenticated but on auth routes -> send to game
-      router.replace("/game");
+      // Authenticated but on auth routes -> send to play page
+      router.replace("/play");
     }
   }, [auth.isAuthenticated, segments.join("/")]);
 

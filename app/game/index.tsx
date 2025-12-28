@@ -372,25 +372,18 @@ const Page = () => {
     <View style={[styles.container, { backgroundColor }]}>
       <Stack.Screen
         options={{
-          title: "",
           headerShown: false,
-          headerRight: () => (
-            <View style={styles.headerIcons}>
-              <Ionicons
-                name="help-circle-outline"
-                size={28}
-                color={textColor}
-              />
-              <Ionicons name="podium-outline" size={24} color={textColor} />
-              <TouchableOpacity onPress={handlePresentSubscribeModalPress}>
-                <Ionicons name="settings-sharp" size={24} color={textColor} />
-              </TouchableOpacity>
-            </View>
-          ),
         }}
       />
 
-      {/* Loading State */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.push("/play")}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="arrow-back" size={28} color={textColor} />
+      </TouchableOpacity>
+
       {loadingWord && (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={textColor} />
@@ -485,7 +478,10 @@ const Page = () => {
             </Text>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowSuccessModal(false)}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.push("/play");
+              }}
             >
               <Text style={styles.closeButtonText}>Awesome!</Text>
             </TouchableOpacity>
@@ -502,9 +498,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 40,
   },
+  backButton: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    zIndex: 100,
+  },
   gameField: {
     alignItems: "center",
     gap: 8,
+    marginTop: 60,
   },
   gameFieldRow: {
     flexDirection: "row",
