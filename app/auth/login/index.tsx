@@ -7,14 +7,12 @@ import { usePost } from "@/service/hooks/useMutation";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { LOGIN_LABEL } from "../label";
@@ -151,7 +149,7 @@ export default function LoginPage() {
     if (phoneNumber.trim()) {
       setErrorMessage("");
       await sendOtp({
-        mobile: `${phoneNumber.trim()}`,
+        mobile: `+91${phoneNumber.trim()}`,
         useWhatsApp: otpMethod === "whatsapp",
       });
     } else {
@@ -199,125 +197,121 @@ export default function LoginPage() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View>
-            <ThemedText
-              style={[styles.title, { fontFamily: "FrankRuhlLibre_700Bold" }]}
-              type="title"
-            >
-              {labels.LOGIN.TITLE}
-            </ThemedText>
-          </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View>
+          <ThemedText
+            style={[styles.title, { fontFamily: "FrankRuhlLibre_700Bold" }]}
+            type="title"
+          >
+            {labels.LOGIN.TITLE}
+          </ThemedText>
+        </View>
 
-          <View style={styles.formContainer}>
-            <TextInput
-              style={[styles.input, errorMessage ? styles.inputError : null]}
-              placeholder={labels.LOGIN.PHONE_NUMBER_LABEL}
-              placeholderTextColor="#81C784"
-              value={phoneNumber}
-              onChangeText={(text) => {
-                setPhoneNumber(text);
-                if (errorMessage) setErrorMessage("");
-              }}
-              keyboardType="phone-pad"
-            />
-
-            {errorMessage ? (
-              <ThemedText style={styles.errorText}>{errorMessage}</ThemedText>
-            ) : null}
-
-            <View style={styles.otpMethodContainer}>
-              <ThemedText
-                style={[
-                  styles.label,
-                  { fontFamily: "FrankRuhlLibre_500Medium" },
-                ]}
-                type="default"
-              >
-                {labels.LOGIN.RECEIVE_OTP_VIA_LABEL}
-              </ThemedText>
-
-              <View style={styles.radioGroup}>
-                <TouchableOpacity
-                  style={styles.radioOption}
-                  onPress={() => setOtpMethod("sms")}
-                >
-                  <View style={styles.radioCircle}>
-                    {otpMethod === "sms" && (
-                      <View style={styles.radioCircleSelected} />
-                    )}
-                  </View>
-                  <ThemedText
-                    style={[
-                      styles.radioLabel,
-                      { fontFamily: "FrankRuhlLibre_500Medium" },
-                    ]}
-                  >
-                    {labels.LOGIN.SMS_OPTION}
-                  </ThemedText>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.radioOption}
-                  onPress={() => setOtpMethod("whatsapp")}
-                >
-                  <View style={styles.radioCircle}>
-                    {otpMethod === "whatsapp" && (
-                      <View style={styles.radioCircleSelected} />
-                    )}
-                  </View>
-                  <ThemedText
-                    style={[
-                      styles.radioLabel,
-                      { fontFamily: "FrankRuhlLibre_500Medium" },
-                    ]}
-                  >
-                    {labels.LOGIN.WHATSAPP_OPTION}
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.buttonContainer}>
-              <OutlinedButton
-                title={LOGIN_LABEL.BUTTON_LABEL.GENERATE_OTP}
-                onPress={handleGenerateOTP}
-                isLoading={sendingOtp}
-              />
-            </View>
-          </View>
-
-          {showSuccessModal && (
-            <LocalModal
-              showSuccessModal={showSuccessModal}
-              setShowSuccessModal={setShowSuccessModal}
-              phoneNumber={phoneNumber}
-              otpMethod={otpMethod}
-              otpSent={otpSent}
-              otp={otp}
-              setOtp={setOtp}
-              errorMessage={errorMessage}
-              setErrorMessage={setErrorMessage}
-              handleVerifyOtp={handleVerifyOtp}
-              handleResendOtp={handleResendOtp}
-              isVerifying={verifyingOtp}
-              isResending={resendingOtp}
-            />
-          )}
-
-          <UsernameModal
-            visible={showUsernameModal}
-            onSubmit={handleCreateUsername}
-            isLoading={creatingUsername}
-            errorMessage={usernameError}
+        <View style={styles.formContainer}>
+          <TextInput
+            style={[styles.input, errorMessage ? styles.inputError : null]}
+            placeholder={labels.LOGIN.PHONE_NUMBER_LABEL}
+            placeholderTextColor="#81C784"
+            value={phoneNumber}
+            onChangeText={(text) => {
+              const num = isNaN(Number(text));
+              if (!num) setPhoneNumber(text);
+              if (errorMessage) setErrorMessage("");
+            }}
+            keyboardType="phone-pad"
           />
-        </ScrollView>
-      </TouchableWithoutFeedback>
+
+          {errorMessage ? (
+            <ThemedText style={styles.errorText}>{errorMessage}</ThemedText>
+          ) : null}
+
+          <View style={styles.otpMethodContainer}>
+            <ThemedText
+              style={[styles.label, { fontFamily: "FrankRuhlLibre_500Medium" }]}
+              type="default"
+            >
+              {labels.LOGIN.RECEIVE_OTP_VIA_LABEL}
+            </ThemedText>
+
+            <View style={styles.radioGroup}>
+              <TouchableOpacity
+                style={styles.radioOption}
+                onPress={() => setOtpMethod("sms")}
+              >
+                <View style={styles.radioCircle}>
+                  {otpMethod === "sms" && (
+                    <View style={styles.radioCircleSelected} />
+                  )}
+                </View>
+                <ThemedText
+                  style={[
+                    styles.radioLabel,
+                    { fontFamily: "FrankRuhlLibre_500Medium" },
+                  ]}
+                >
+                  {labels.LOGIN.SMS_OPTION}
+                </ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.radioOption}
+                onPress={() => setOtpMethod("whatsapp")}
+              >
+                <View style={styles.radioCircle}>
+                  {otpMethod === "whatsapp" && (
+                    <View style={styles.radioCircleSelected} />
+                  )}
+                </View>
+                <ThemedText
+                  style={[
+                    styles.radioLabel,
+                    { fontFamily: "FrankRuhlLibre_500Medium" },
+                  ]}
+                >
+                  {labels.LOGIN.WHATSAPP_OPTION}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <OutlinedButton
+              title={LOGIN_LABEL.BUTTON_LABEL.GENERATE_OTP}
+              onPress={handleGenerateOTP}
+              isLoading={sendingOtp}
+            />
+          </View>
+        </View>
+
+        {showSuccessModal && (
+          <LocalModal
+            showSuccessModal={showSuccessModal}
+            setShowSuccessModal={setShowSuccessModal}
+            phoneNumber={phoneNumber}
+            otpMethod={otpMethod}
+            otpSent={otpSent}
+            otp={otp}
+            setOtp={setOtp}
+            errorMessage={errorMessage}
+            setErrorMessage={setErrorMessage}
+            handleVerifyOtp={handleVerifyOtp}
+            handleResendOtp={handleResendOtp}
+            isVerifying={verifyingOtp}
+            isResending={resendingOtp}
+          />
+        )}
+
+        <UsernameModal
+          visible={showUsernameModal}
+          onSubmit={handleCreateUsername}
+          isLoading={creatingUsername}
+          errorMessage={usernameError}
+        />
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
