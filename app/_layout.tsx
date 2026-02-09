@@ -12,6 +12,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { TouchableOpacity } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Toast from "react-native-toast-message";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -84,6 +85,7 @@ export const RootLayout = () => {
             }}
           />
         </Stack>
+        <Toast />
       </AuthProvider>
     </GestureHandlerRootView>
   );

@@ -8,7 +8,6 @@ import { ENDPOINTS } from "@/service/endpoints";
 import { useFetch } from "@/service/hooks/useFetch";
 import { useMutation } from "@/service/hooks/useMutation";
 import { Ionicons } from "@expo/vector-icons";
-import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -55,7 +54,7 @@ const Page = () => {
   const grayColor = Colors[colorScheme ?? "light"].gray;
 
   const [rows, setRows] = useState<string[][]>(
-    new Array(ROWS).fill(new Array(5).fill(""))
+    new Array(ROWS).fill(new Array(5).fill("")),
   );
   const [curRow, setCurRow] = useState(0);
   const [curCol, _setCurCol] = useState(0);
@@ -67,7 +66,6 @@ const Page = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [word, setWord] = useState<string>("");
 
-  const settingsModalRef = useRef<BottomSheetModal>(null);
   const colStateRef = useRef(curCol);
 
   const router = useRouter();
@@ -103,9 +101,6 @@ const Page = () => {
   }, [dailyWordData]);
 
   const wordLetters = word ? word.split("") : [];
-
-  const handlePresentSubscribeModalPress = () =>
-    settingsModalRef.current?.present();
 
   const setCurCol = (data: number) => {
     colStateRef.current = data;
@@ -258,17 +253,17 @@ const Page = () => {
       if (wordLetters[cellIndex] === cell) {
         cellBackgrounds[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(Colors.light.green)
+          withTiming(Colors.light.green),
         );
       } else if (wordLetters.includes(cell)) {
         cellBackgrounds[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(Colors.light.yellow)
+          withTiming(Colors.light.yellow),
         );
       } else {
         cellBackgrounds[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(grayColor)
+          withTiming(grayColor),
         );
       }
     } else {
@@ -281,23 +276,23 @@ const Page = () => {
   const setBorderColor = (
     cell: string,
     rowIndex: number,
-    cellIndex: number
+    cellIndex: number,
   ) => {
     if (curRow > rowIndex && cell !== "" && wordLetters.length > 0) {
       if (wordLetters[cellIndex] === cell) {
         cellBorders[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(Colors.light.green)
+          withTiming(Colors.light.green),
         );
       } else if (wordLetters.includes(cell)) {
         cellBorders[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(Colors.light.yellow)
+          withTiming(Colors.light.yellow),
         );
       } else {
         cellBorders[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(grayColor)
+          withTiming(grayColor),
         );
       }
     }
@@ -311,19 +306,19 @@ const Page = () => {
       return {
         transform: [{ translateX: offsetShakes[index].value }],
       };
-    })
+    }),
   );
 
   const tileRotates = Array.from({ length: ROWS }, () =>
-    Array.from({ length: 5 }, () => useSharedValue(0))
+    Array.from({ length: 5 }, () => useSharedValue(0)),
   );
 
   const cellBackgrounds = Array.from({ length: ROWS }, () =>
-    Array.from({ length: 5 }, () => useSharedValue("transparent"))
+    Array.from({ length: 5 }, () => useSharedValue("transparent")),
   );
 
   const cellBorders = Array.from({ length: ROWS }, () =>
-    Array.from({ length: 5 }, () => useSharedValue(Colors.light.gray))
+    Array.from({ length: 5 }, () => useSharedValue(Colors.light.gray)),
   );
 
   const tileStyles = Array.from({ length: ROWS }, (_, index) => {
@@ -334,7 +329,7 @@ const Page = () => {
           borderColor: cellBorders[index][tileIndex].value,
           backgroundColor: cellBackgrounds[index][tileIndex].value,
         };
-      })
+      }),
     );
   });
 
@@ -345,7 +340,7 @@ const Page = () => {
     offsetShakes[curRow].value = withSequence(
       withTiming(-OFFSET, { duration: TIME / 2 }),
       withRepeat(withTiming(OFFSET, { duration: TIME }), 4, true),
-      withTiming(0, { duration: TIME / 2 })
+      withTiming(0, { duration: TIME / 2 }),
     );
   };
 
@@ -358,8 +353,8 @@ const Page = () => {
         index * 100,
         withSequence(
           withTiming(OFFSET, { duration: TIME }, () => {}),
-          withTiming(0, { duration: TIME })
-        )
+          withTiming(0, { duration: TIME }),
+        ),
       );
     });
   };

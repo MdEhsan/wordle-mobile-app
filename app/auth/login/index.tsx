@@ -49,17 +49,17 @@ export default function LoginPage() {
     {
       onSuccess: (data) => {
         if (data?.mobile) {
-          setMobileNumberFromApi(data.mobile);
+          setMobileNumberFromApi(data?.messageResult?.data?.to);
         }
         setOtpSent(true);
         setShowSuccessModal(true);
       },
       onError: (error) => {
         setErrorMessage(
-          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SEND
+          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SEND,
         );
       },
-    }
+    },
   );
 
   const { mutate: loginWithOtp, loading: verifyingOtp } = usePost(
@@ -83,7 +83,7 @@ export default function LoginPage() {
               router.replace("/play");
             } catch (_error) {
               setErrorMessage(
-                LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN
+                LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN,
               );
             }
           }
@@ -93,10 +93,10 @@ export default function LoginPage() {
       },
       onError: (error) => {
         setErrorMessage(
-          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.INVALID_OTP
+          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.INVALID_OTP,
         );
       },
-    }
+    },
   );
 
   const { mutate: resendOtp, loading: resendingOtp } = usePost(
@@ -109,10 +109,10 @@ export default function LoginPage() {
       },
       onError: (error) => {
         setErrorMessage(
-          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_RESEND
+          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_RESEND,
         );
       },
-    }
+    },
   );
 
   const { mutate: createUsername, loading: creatingUsername } = usePost(
@@ -124,14 +124,14 @@ export default function LoginPage() {
           try {
             await auth.login(
               pendingAuthData.token,
-              data.user || pendingAuthData.user
+              data.user || pendingAuthData.user,
             );
             setShowUsernameModal(false);
             router.replace("/play");
           } catch (_error) {
             console.log("Error saving login after username creation:", _error);
             setUsernameError(
-              LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN
+              LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN,
             );
           }
         }
@@ -139,10 +139,10 @@ export default function LoginPage() {
       onError: (error) => {
         setUsernameError(
           error.message ||
-            LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_CREATE_USERNAME
+            LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_CREATE_USERNAME,
         );
       },
-    }
+    },
   );
 
   const handleGenerateOTP = async () => {
@@ -169,7 +169,7 @@ export default function LoginPage() {
     }
 
     await loginWithOtp({
-      mobile: mobileNumberFromApi || `${phoneNumber.trim()}`,
+      mobile: `${mobileNumberFromApi}` || `+91${phoneNumber.trim()}`,
       otp: otp.trim(),
     });
   };
@@ -180,7 +180,7 @@ export default function LoginPage() {
       setOtp("");
 
       await resendOtp({
-        mobile: mobileNumberFromApi || `${phoneNumber.trim()}`,
+        mobile: `${mobileNumberFromApi}` || `+91${phoneNumber.trim()}`,
         useWhatsApp: otpMethod === "whatsapp",
       });
     }

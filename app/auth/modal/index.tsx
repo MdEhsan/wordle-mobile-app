@@ -90,7 +90,7 @@ export const LocalModal = ({
           </View>
           <ThemedText style={styles.modalTitle}>Success!</ThemedText>
           <ThemedText style={styles.modalMessage}>
-            OTP will be sent to {phoneNumber} via{" "}
+            OTP will be sent to +91{phoneNumber} via{" "}
             {otpMethod === "whatsapp" ? "WhatsApp" : "SMS"}
           </ThemedText>
 
