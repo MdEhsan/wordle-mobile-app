@@ -109,7 +109,11 @@ export const LocalModal = ({
             OTP will be sent to +91{phoneNumber} via{" "}
             {otpMethod === "whatsapp" ? "WhatsApp" : "SMS"}
           </ThemedText>
-
+          {errorMessage && (
+            <ThemedText style={[styles.modalMessage, { color: "#F44336" }]}>
+              {errorMessage}
+            </ThemedText>
+          )}
           {/* OTP input and verify button */}
           {true ? (
             <View style={{ width: "100%", marginTop: 16 }}>

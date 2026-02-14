@@ -17,7 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Toast from "react-native-toast-message";
 import { LOGIN_LABEL } from "../label";
 import { LocalModal } from "../modal";
 import { UsernameModal } from "../username-modal";
@@ -98,17 +97,9 @@ export default function LoginPage() {
           setErrorMessage(LOGIN_LABEL.INVALID_RESPONSE);
         }
       },
-      onError: (error) => {
-        console.log("Login error:", error);
+      onError: (_error) => {
         setVerifyOtpFailed(true);
-        setErrorMessage(error.message);
-        Toast.show({
-          type: "error",
-          text1: LOGIN_LABEL.API_ERROR_MESSAGE.INVALID_OTP,
-          text2: error.message,
-          position: "bottom",
-          bottomOffset: 100,
-        });
+        setErrorMessage(LOGIN_LABEL.API_ERROR_MESSAGE.INVALID_OTP);
       },
     },
   );
