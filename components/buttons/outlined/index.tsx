@@ -1,4 +1,6 @@
 import { ThemedText } from "@/components/themed-text";
+import { Colors } from "@/constants/Color";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
 import { OutlinedButtonProps } from "../types";
 
@@ -6,14 +8,25 @@ export default function OutlinedButton({
   title,
   onPress,
   isLoading = false,
+  borderColor,
 }: OutlinedButtonProps) {
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? "light"];
+
   return (
-    <Pressable style={styles.button} onPress={onPress} disabled={isLoading}>
+    <Pressable
+      style={[styles.button, { borderColor: borderColor || palette.border }]}
+      onPress={onPress}
+      disabled={isLoading}
+    >
       {isLoading ? (
-        <ActivityIndicator color="#1B5E20" />
+        <ActivityIndicator color={palette.text} />
       ) : (
         <ThemedText
-          style={{ color: "#1B5E20", fontFamily: "FrankRuhlLibre_500Medium" }}
+          style={{
+            color: palette.text,
+            fontFamily: "FrankRuhlLibre_500Medium",
+          }}
           type="defaultSemiBold"
         >
           {title}
@@ -26,7 +39,6 @@ export default function OutlinedButton({
 const styles = StyleSheet.create({
   button: {
     borderWidth: 1,
-    borderColor: "#66BB6A",
     paddingVertical: 10,
     paddingHorizontal: 50,
     borderRadius: 20,

@@ -1,7 +1,9 @@
 import useAuth from "@/auth-protect/useAuth";
 import OutlinedButton from "@/components/buttons/outlined";
 import { ThemedText } from "@/components/themed-text";
+import { Colors } from "@/constants/Color";
 import { labels } from "@/constants/label";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
 import { usePost } from "@/service/hooks/useMutation";
 import { useRouter } from "expo-router";
@@ -15,16 +17,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { LOGIN_LABEL } from "../label";
 import { LocalModal } from "../modal";
 import { UsernameModal } from "../username-modal";
 
 export default function LoginPage() {
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? "light"];
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpMethod, setOtpMethod] = useState<"whatsapp" | "sms">("sms");
   const [errorMessage, setErrorMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [otp, setOtp] = useState("");
+  const [verifyOtpFailed, setVerifyOtpFailed] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [mobileNumberFromApi, setMobileNumberFromApi] = useState("");
   const [showUsernameModal, setShowUsernameModal] = useState(false);
@@ -66,6 +72,7 @@ export default function LoginPage() {
     ENDPOINTS.AUTH.LOGIN,
     {
       onSuccess: async (data) => {
+        setVerifyOtpFailed(false);
         if (data?.token) {
           // Check if username exists
           if (!data.user?.username) {
@@ -92,9 +99,16 @@ export default function LoginPage() {
         }
       },
       onError: (error) => {
-        setErrorMessage(
-          error.message || LOGIN_LABEL.API_ERROR_MESSAGE.INVALID_OTP,
-        );
+        console.log("Login error:", error);
+        setVerifyOtpFailed(true);
+        setErrorMessage(error.message);
+        Toast.show({
+          type: "error",
+          text1: LOGIN_LABEL.API_ERROR_MESSAGE.INVALID_OTP,
+          text2: error.message,
+          position: "bottom",
+          bottomOffset: 100,
+        });
       },
     },
   );
@@ -158,6 +172,8 @@ export default function LoginPage() {
   };
 
   const handleVerifyOtp = async () => {
+    setVerifyOtpFailed(false);
+
     if (!otp.trim()) {
       setErrorMessage("Please enter the OTP");
       return;
@@ -183,6 +199,8 @@ export default function LoginPage() {
         mobile: `${mobileNumberFromApi}` || `+91${phoneNumber.trim()}`,
         useWhatsApp: otpMethod === "whatsapp",
       });
+
+      setVerifyOtpFailed(false);
     }
   };
 
@@ -193,7 +211,7 @@ export default function LoginPage() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: palette.background }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
@@ -204,18 +222,29 @@ export default function LoginPage() {
       >
         <View>
           <ThemedText
-            style={[styles.title, { fontFamily: "FrankRuhlLibre_700Bold" }]}
+            style={[
+              styles.title,
+              { fontFamily: "FrankRuhlLibre_700Bold", color: palette.icon },
+            ]}
             type="title"
           >
             {labels.LOGIN.TITLE}
           </ThemedText>
         </View>
 
-        <View style={styles.formContainer}>
+        <View style={[styles.formContainer, { backgroundColor: palette.card }]}>
           <TextInput
-            style={[styles.input, errorMessage ? styles.inputError : null]}
+            style={[
+              styles.input,
+              {
+                borderColor: palette.border,
+                backgroundColor: palette.card,
+                color: palette.text,
+              },
+              errorMessage ? styles.inputError : null,
+            ]}
             placeholder={labels.LOGIN.PHONE_NUMBER_LABEL}
-            placeholderTextColor="#81C784"
+            placeholderTextColor={palette.mutedText}
             value={phoneNumber}
             onChangeText={(text) => {
               const num = isNaN(Number(text));
@@ -231,7 +260,10 @@ export default function LoginPage() {
 
           <View style={styles.otpMethodContainer}>
             <ThemedText
-              style={[styles.label, { fontFamily: "FrankRuhlLibre_500Medium" }]}
+              style={[
+                styles.label,
+                { color: palette.text, fontFamily: "FrankRuhlLibre_500Medium" },
+              ]}
               type="default"
             >
               {labels.LOGIN.RECEIVE_OTP_VIA_LABEL}
@@ -242,15 +274,31 @@ export default function LoginPage() {
                 style={styles.radioOption}
                 onPress={() => setOtpMethod("sms")}
               >
-                <View style={styles.radioCircle}>
+                <View
+                  style={[
+                    styles.radioCircle,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: palette.card,
+                    },
+                  ]}
+                >
                   {otpMethod === "sms" && (
-                    <View style={styles.radioCircleSelected} />
+                    <View
+                      style={[
+                        styles.radioCircleSelected,
+                        { backgroundColor: palette.green },
+                      ]}
+                    />
                   )}
                 </View>
                 <ThemedText
                   style={[
                     styles.radioLabel,
-                    { fontFamily: "FrankRuhlLibre_500Medium" },
+                    {
+                      color: palette.icon,
+                      fontFamily: "FrankRuhlLibre_500Medium",
+                    },
                   ]}
                 >
                   {labels.LOGIN.SMS_OPTION}
@@ -261,15 +309,31 @@ export default function LoginPage() {
                 style={styles.radioOption}
                 onPress={() => setOtpMethod("whatsapp")}
               >
-                <View style={styles.radioCircle}>
+                <View
+                  style={[
+                    styles.radioCircle,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: palette.card,
+                    },
+                  ]}
+                >
                   {otpMethod === "whatsapp" && (
-                    <View style={styles.radioCircleSelected} />
+                    <View
+                      style={[
+                        styles.radioCircleSelected,
+                        { backgroundColor: palette.green },
+                      ]}
+                    />
                   )}
                 </View>
                 <ThemedText
                   style={[
                     styles.radioLabel,
-                    { fontFamily: "FrankRuhlLibre_500Medium" },
+                    {
+                      color: palette.icon,
+                      fontFamily: "FrankRuhlLibre_500Medium",
+                    },
                   ]}
                 >
                   {labels.LOGIN.WHATSAPP_OPTION}
@@ -295,11 +359,17 @@ export default function LoginPage() {
             otpMethod={otpMethod}
             otpSent={otpSent}
             otp={otp}
-            setOtp={setOtp}
+            setOtp={(value) => {
+              setOtp(value);
+              if (verifyOtpFailed) {
+                setVerifyOtpFailed(false);
+              }
+            }}
             errorMessage={errorMessage}
             setErrorMessage={setErrorMessage}
             handleVerifyOtp={handleVerifyOtp}
             handleResendOtp={handleResendOtp}
+            verifyOtpFailed={verifyOtpFailed}
             isVerifying={verifyingOtp}
             isResending={resendingOtp}
           />
@@ -319,7 +389,6 @@ export default function LoginPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#E8F5E9",
   },
   scrollContent: {
     flexGrow: 1,
@@ -357,18 +426,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 10,
     fontWeight: "500",
-    color: "#1B5E20",
   },
   input: {
     height: 50,
     borderWidth: 2,
-    borderColor: "#66BB6A",
     borderRadius: 8,
     paddingHorizontal: 15,
     fontSize: 16,
-    backgroundColor: "#fff",
     marginBottom: 8,
-    color: "#1B5E20",
     fontFamily: "FrankRuhlLibre_500Medium",
   },
   inputError: {
@@ -398,20 +463,16 @@ const styles = StyleSheet.create({
     width: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#66BB6A",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
   },
   radioCircleSelected: {
     height: 12,
     width: 12,
     borderRadius: 6,
-    backgroundColor: "#43A047",
   },
   radioLabel: {
     fontSize: 16,
-    color: "#2E7D32",
   },
   buttonContainer: {
     marginTop: 10,

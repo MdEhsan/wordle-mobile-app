@@ -1,3 +1,4 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Platform,
@@ -31,6 +32,8 @@ const OnScreenKeyboard = ({
   yellowLetters,
   grayLetters,
 }: OnScreenKeyboardProps) => {
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? "light"];
   const { width } = useWindowDimensions();
   const keyWidth = Platform.OS === "web" ? 58 : (width - 60) / keys[0].length;
   const keyHeight = 60;
@@ -50,23 +53,28 @@ const OnScreenKeyboard = ({
               key={`key-${key}`}
               style={({ pressed }) => [
                 styles.key,
-                { width: keyWidth, height: keyHeight, backgroundColor: "#ddd" },
+                {
+                  width: keyWidth,
+                  height: keyHeight,
+                  backgroundColor: palette.keyDefault,
+                },
                 isSpecialKey(key) && { width: keyWidth * 1.5 },
                 pressed && { backgroundColor: "#868686" },
                 {
                   backgroundColor: greenLetters.includes(key)
-                    ? Colors.light.green
+                    ? palette.green
                     : yellowLetters.includes(key)
-                    ? Colors.light.yellow
-                    : grayLetters.includes(key)
-                    ? Colors.light.gray
-                    : "#ddd",
+                      ? palette.yellow
+                      : grayLetters.includes(key)
+                        ? palette.gray
+                        : palette.keyDefault,
                 },
               ]}
             >
               <Text
                 style={[
                   styles.keyText,
+                  { color: palette.keyText },
                   key === "ENTER" && { fontSize: 12 },
                   isInLetters(key) && { color: "#fff" },
                 ]}
@@ -78,7 +86,7 @@ const OnScreenKeyboard = ({
                     <Ionicons
                       name="backspace-outline"
                       size={24}
-                      color="black"
+                      color={palette.keyText}
                     />
                   )
                 ) : (

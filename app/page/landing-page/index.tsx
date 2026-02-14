@@ -1,20 +1,27 @@
 import OutlinedButton from "@/components/buttons/outlined";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Colors } from "@/constants/Color";
 import { labels } from "@/constants/label";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Link } from "expo-router";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
 export default function LandingPage() {
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? "light"];
+
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView
+      style={[styles.container, { backgroundColor: palette.background }]}
+    >
       <ThemedText
         style={{
           fontSize: 60,
           lineHeight: 40,
           paddingVertical: 5,
-          color: "#2E7D32",
+          color: palette.icon,
           fontFamily: "FrankRuhlLibre_700Bold",
         }}
         type="title"
@@ -27,7 +34,7 @@ export default function LandingPage() {
             fontWeight: "normal",
             fontSize: 40,
             lineHeight: 40,
-            color: "#388E3C",
+            color: palette.mutedText,
             fontFamily: "FrankRuhlLibre_700Bold",
           }}
           type="subtitle"
@@ -39,7 +46,7 @@ export default function LandingPage() {
             fontWeight: "normal",
             fontSize: 40,
             lineHeight: 40,
-            color: "#388E3C",
+            color: palette.mutedText,
           }}
           type="subtitle"
         >
@@ -60,12 +67,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#E8F5E9",
   },
   containerText: {
     marginTop: 20,
     alignItems: "center",
     justifyContent: "center",
-    color: "#2E7D32",
   },
 });

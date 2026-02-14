@@ -4,6 +4,8 @@ import OnScreenKeyboard, {
   ENTER,
 } from "@/components/onScreenkeyboard";
 import { Colors } from "@/constants/Color";
+import { useAppTheme } from "@/hooks/app-theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
 import { useFetch } from "@/service/hooks/useFetch";
 import { useMutation } from "@/service/hooks/useMutation";
@@ -14,10 +16,10 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import Animated, {
@@ -49,9 +51,11 @@ const allWords = [
 
 const Page = () => {
   const colorScheme = useColorScheme();
-  const backgroundColor = Colors[colorScheme ?? "light"].gameBg;
-  const textColor = Colors[colorScheme ?? "light"].text;
-  const grayColor = Colors[colorScheme ?? "light"].gray;
+  const palette = Colors[colorScheme ?? "light"];
+  const backgroundColor = palette.gameBg;
+  const textColor = palette.text;
+  const grayColor = palette.gray;
+  const { theme, toggleTheme } = useAppTheme();
 
   const [rows, setRows] = useState<string[][]>(
     new Array(ROWS).fill(new Array(5).fill("")),
@@ -63,6 +67,7 @@ const Page = () => {
   const [yellowLetters, setYellowLetters] = useState<string[]>([]);
   const [grayLetters, setGrayLetters] = useState<string[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [word, setWord] = useState<string>("");
 
@@ -253,12 +258,12 @@ const Page = () => {
       if (wordLetters[cellIndex] === cell) {
         cellBackgrounds[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(Colors.light.green),
+          withTiming(palette.green),
         );
       } else if (wordLetters.includes(cell)) {
         cellBackgrounds[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(Colors.light.yellow),
+          withTiming(palette.yellow),
         );
       } else {
         cellBackgrounds[rowIndex][cellIndex].value = withDelay(
@@ -282,12 +287,12 @@ const Page = () => {
       if (wordLetters[cellIndex] === cell) {
         cellBorders[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(Colors.light.green),
+          withTiming(palette.green),
         );
       } else if (wordLetters.includes(cell)) {
         cellBorders[rowIndex][cellIndex].value = withDelay(
           cellIndex * 200,
-          withTiming(Colors.light.yellow),
+          withTiming(palette.yellow),
         );
       } else {
         cellBorders[rowIndex][cellIndex].value = withDelay(
@@ -296,7 +301,7 @@ const Page = () => {
         );
       }
     }
-    return Colors.light.gray;
+    return palette.gray;
   };
 
   const offsetShakes = Array.from({ length: ROWS }, () => useSharedValue(0));
@@ -318,7 +323,7 @@ const Page = () => {
   );
 
   const cellBorders = Array.from({ length: ROWS }, () =>
-    Array.from({ length: 5 }, () => useSharedValue(Colors.light.gray)),
+    Array.from({ length: 5 }, () => useSharedValue(palette.gray)),
   );
 
   const tileStyles = Array.from({ length: ROWS }, (_, index) => {
@@ -384,13 +389,70 @@ const Page = () => {
         <Ionicons name="arrow-back" size={28} color={textColor} />
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.logoutButton}
-        onPress={handleLogout}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="log-out-outline" size={24} color={textColor} />
-      </TouchableOpacity>
+      {showProfileMenu ? (
+        <Pressable
+          style={styles.menuBackdrop}
+          onPress={() => setShowProfileMenu(false)}
+        />
+      ) : null}
+
+      <View style={styles.profileArea}>
+        <Pressable
+          style={styles.profileButton}
+          onPress={() => setShowProfileMenu((prev) => !prev)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={30}
+            color={palette.icon}
+          />
+        </Pressable>
+
+        {showProfileMenu ? (
+          <View
+            style={[
+              styles.profileMenu,
+              {
+                backgroundColor: palette.card,
+                borderColor: palette.border,
+              },
+            ]}
+          >
+            <Pressable
+              style={styles.menuItem}
+              onPress={async () => {
+                await toggleTheme();
+                setShowProfileMenu(false);
+              }}
+            >
+              <Ionicons
+                name={theme === "light" ? "moon-outline" : "sunny-outline"}
+                size={18}
+                color={textColor}
+              />
+              <Text style={[styles.menuItemText, { color: textColor }]}>
+                {theme === "light"
+                  ? "Switch to Dark Mode"
+                  : "Switch to Light Mode"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.menuItem}
+              onPress={async () => {
+                setShowProfileMenu(false);
+                await handleLogout();
+              }}
+            >
+              <Ionicons name="log-out-outline" size={18} color={textColor} />
+              <Text style={[styles.menuItemText, { color: textColor }]}>
+                Logout
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
 
       {loadingWord && (
         <View style={styles.centerContent}>
@@ -431,6 +493,10 @@ const Page = () => {
                     <Animated.View
                       style={[
                         styles.cell,
+                        {
+                          borderColor: palette.border,
+                          backgroundColor: palette.card,
+                        },
                         // {
                         //   borderColor: getBorderColor(cell, rowIndex, cellIndex),
                         //   backgroundColor: getCellColor(cell, rowIndex, cellIndex),
@@ -471,7 +537,7 @@ const Page = () => {
       >
         <View style={styles.modalOverlay}>
           <Animated.View
-            style={[styles.modalContent, { backgroundColor }]}
+            style={[styles.modalContent, { backgroundColor: palette.card }]}
             entering={ZoomIn.duration(300)}
           >
             <Text style={styles.successEmoji}>🎉</Text>
@@ -481,11 +547,11 @@ const Page = () => {
             <Text style={[styles.successMessage, { color: textColor }]}>
               {successMessage}
             </Text>
-            <Text style={[styles.wordReveal, { color: Colors.light.green }]}>
+            <Text style={[styles.wordReveal, { color: palette.green }]}>
               {`The word was: ${word.toUpperCase()}`}
             </Text>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={[styles.closeButton, { backgroundColor: palette.green }]}
               onPress={() => {
                 setShowSuccessModal(false);
                 router.push("/play");
@@ -512,11 +578,53 @@ const styles = StyleSheet.create({
     left: 20,
     zIndex: 100,
   },
-  logoutButton: {
+  menuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 80,
+  },
+  profileArea: {
     position: "absolute",
     top: 50,
     right: 20,
     zIndex: 100,
+    alignItems: "flex-end",
+  },
+  profileButton: {
+    padding: 8,
+    zIndex: 102,
+  },
+  profileMenu: {
+    position: "absolute",
+    top: 46,
+    right: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 220,
+    paddingVertical: 8,
+    ...StyleSheet.flatten(
+      Platform.select({
+        ios: {
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.2,
+          shadowRadius: 10,
+        },
+        android: {
+          elevation: 8,
+        },
+      }),
+    ),
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  menuItemText: {
+    fontSize: 14,
+    fontFamily: "FrankRuhlLibre_500Medium",
   },
   gameField: {
     alignItems: "center",
@@ -562,7 +670,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: Colors.dark.modalOverlay,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -602,7 +710,6 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   closeButton: {
-    backgroundColor: Colors.light.green,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 25,

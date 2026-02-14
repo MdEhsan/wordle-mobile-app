@@ -1,5 +1,6 @@
 import { AuthProvider } from "@/auth-protect/AuthProvider";
 import useAuth from "@/auth-protect/useAuth";
+import { AppThemeProvider } from "@/hooks/app-theme";
 import {
   FrankRuhlLibre_500Medium,
   FrankRuhlLibre_700Bold,
@@ -36,57 +37,59 @@ export const RootLayout = () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        {/* AuthGate runs inside AuthProvider so it can read auth state and redirect */}
-        <AuthGate />
-        <Stack>
-          <Stack.Screen
-            name="index"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="auth"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="play"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="game"
-            options={{
-              headerBackTitle: "Wordle",
-              // headerTintColor: colorScheme === "dark" ? "#fff" : "#000",
-              headerBackTitleStyle: {
-                fontFamily: "FrankRuhlLibre_800ExtraBold",
-                fontSize: 26,
-              },
-              title: "",
-            }}
-          />
-          <Stack.Screen
-            name="login"
-            options={{
-              presentation: "modal",
-              headerShadowVisible: false,
-              headerBackTitle: "",
-              headerTitle: "Login",
-              headerLeft: () => (
-                <TouchableOpacity onPress={() => router.back()}>
-                  <Ionicons name="close" size={26} color="#2E7D32" />
-                </TouchableOpacity>
-              ),
-            }}
-          />
-        </Stack>
-        <Toast />
-      </AuthProvider>
+      <AppThemeProvider>
+        <AuthProvider>
+          {/* AuthGate runs inside AuthProvider so it can read auth state and redirect */}
+          <AuthGate />
+          <Stack>
+            <Stack.Screen
+              name="index"
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="auth"
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="play"
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="game"
+              options={{
+                headerBackTitle: "Wordle",
+                // headerTintColor: colorScheme === "dark" ? "#fff" : "#000",
+                headerBackTitleStyle: {
+                  fontFamily: "FrankRuhlLibre_800ExtraBold",
+                  fontSize: 26,
+                },
+                title: "",
+              }}
+            />
+            <Stack.Screen
+              name="login"
+              options={{
+                presentation: "modal",
+                headerShadowVisible: false,
+                headerBackTitle: "",
+                headerTitle: "Login",
+                headerLeft: () => (
+                  <TouchableOpacity onPress={() => router.back()}>
+                    <Ionicons name="close" size={26} color="#2E7D32" />
+                  </TouchableOpacity>
+                ),
+              }}
+            />
+          </Stack>
+          <Toast />
+        </AuthProvider>
+      </AppThemeProvider>
     </GestureHandlerRootView>
   );
 };

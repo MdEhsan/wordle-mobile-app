@@ -1,8 +1,11 @@
 import OutlinedButton from "@/components/buttons/outlined";
 import { ThemedText } from "@/components/themed-text";
+import { Colors } from "@/constants/Color";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -25,9 +28,12 @@ export const LocalModal = ({
   setErrorMessage,
   handleVerifyOtp,
   handleResendOtp,
+  verifyOtpFailed = false,
   isVerifying = false,
   isResending = false,
 }: LocalModalPropsType) => {
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? "light"];
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const [countdown, setCountdown] = useState(30);
   const [canResend, setCanResend] = useState(false);
@@ -83,13 +89,23 @@ export const LocalModal = ({
       animationType="fade"
       onRequestClose={() => setShowSuccessModal(false)}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+      <Pressable
+        style={[styles.modalOverlay, { backgroundColor: palette.modalOverlay }]}
+        onPress={Keyboard.dismiss}
+      >
+        <Pressable
+          style={[styles.modalContent, { backgroundColor: palette.card }]}
+          onPress={() => {}}
+        >
           <View style={styles.checkmarkCircle}>
             <MaterialCommunityIcons name="check-bold" size={24} color="white" />
           </View>
-          <ThemedText style={styles.modalTitle}>Success!</ThemedText>
-          <ThemedText style={styles.modalMessage}>
+          <ThemedText style={[styles.modalTitle, { color: palette.icon }]}>
+            Success!
+          </ThemedText>
+          <ThemedText
+            style={[styles.modalMessage, { color: palette.mutedText }]}
+          >
             OTP will be sent to +91{phoneNumber} via{" "}
             {otpMethod === "whatsapp" ? "WhatsApp" : "SMS"}
           </ThemedText>
@@ -104,7 +120,15 @@ export const LocalModal = ({
                     ref={(ref) => {
                       inputRefs.current[index] = ref;
                     }}
-                    style={styles.otpInput}
+                    style={[
+                      styles.otpInput,
+                      {
+                        borderColor: palette.border,
+                        backgroundColor: palette.card,
+                        color: palette.text,
+                      },
+                    ]}
+                    placeholderTextColor={palette.mutedText}
                     value={otpDigits[index].trim()}
                     onChangeText={(text) => handleOtpChange(text, index)}
                     onKeyPress={(e) => handleKeyPress(e, index)}
@@ -117,6 +141,7 @@ export const LocalModal = ({
               <OutlinedButton
                 title="Verify OTP"
                 onPress={handleVerifyOtp}
+                borderColor={verifyOtpFailed ? "#F44336" : undefined}
                 isLoading={isVerifying || isResending}
               />
 
@@ -135,20 +160,21 @@ export const LocalModal = ({
                 <ThemedText
                   style={[
                     styles.resendText,
+                    { color: palette.icon },
                     (!canResend || isResending) && styles.resendTextDisabled,
                   ]}
                 >
                   {isResending
                     ? LOGIN_LABEL.RESEND_OTP.RESENDING_LABEL
                     : canResend
-                    ? LOGIN_LABEL.RESEND_OTP.LABEL
-                    : `${LOGIN_LABEL.RESEND_OTP.TIMER_LABEL} ${countdown}s`}
+                      ? LOGIN_LABEL.RESEND_OTP.LABEL
+                      : `${LOGIN_LABEL.RESEND_OTP.TIMER_LABEL} ${countdown}s`}
                 </ThemedText>
               </Pressable>
             </View>
           ) : null}
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 };
@@ -156,30 +182,27 @@ export const LocalModal = ({
 const styles = StyleSheet.create({
   otpContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     marginBottom: 16,
     gap: 6,
   },
   otpInput: {
-    width: 45,
+    width: "14%",
+    minWidth: 34,
+    maxWidth: 45,
     height: 56,
     borderWidth: 2,
-    borderColor: "#66BB6A",
     borderRadius: 8,
     fontSize: 24,
-    backgroundColor: "#fff",
-    color: "#1B5E20",
     fontFamily: "FrankRuhlLibre_500Medium",
     textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 30,
     alignItems: "center",
@@ -209,12 +232,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#2E7D32",
     marginBottom: 12,
   },
   modalMessage: {
     fontSize: 16,
-    color: "#388E3C",
     textAlign: "center",
     lineHeight: 24,
   },
@@ -224,7 +245,6 @@ const styles = StyleSheet.create({
   },
   resendText: {
     fontSize: 14,
-    color: "#2E7D32",
     fontFamily: "FrankRuhlLibre_500Medium",
     textDecorationLine: "underline",
   },

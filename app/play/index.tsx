@@ -1,5 +1,7 @@
 import useAuth from "@/auth-protect/useAuth";
 import { Colors } from "@/constants/Color";
+import { useAppTheme } from "@/hooks/app-theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
 import { usePost } from "@/service/hooks";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,10 +9,11 @@ import { Stack, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
@@ -25,10 +28,13 @@ interface StartGameResponse {
 export default function PlayPage() {
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const backgroundColor = Colors[colorScheme ?? "light"].gameBg;
-  const textColor = Colors[colorScheme ?? "light"].text;
+  const palette = Colors[colorScheme ?? "light"];
+  const backgroundColor = palette.gameBg;
+  const textColor = palette.text;
   const auth = useAuth();
+  const { theme, toggleTheme } = useAppTheme();
   const [mode, setMode] = useState<UIMode>("SINGLE");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const { mutate: startGame, loading: isStarting } = usePost<
     StartGameResponse,
@@ -69,9 +75,70 @@ export default function PlayPage() {
         }}
       />
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={24} color={textColor} />
-      </TouchableOpacity>
+      {showProfileMenu ? (
+        <Pressable
+          style={styles.menuBackdrop}
+          onPress={() => setShowProfileMenu(false)}
+        />
+      ) : null}
+
+      <View style={styles.profileArea}>
+        <Pressable
+          style={styles.profileButton}
+          onPress={() => setShowProfileMenu((prev) => !prev)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={30}
+            color={palette.icon}
+          />
+        </Pressable>
+
+        {showProfileMenu ? (
+          <View
+            style={[
+              styles.profileMenu,
+              {
+                backgroundColor: palette.card,
+                borderColor: palette.border,
+              },
+            ]}
+          >
+            <Pressable
+              style={styles.menuItem}
+              onPress={async () => {
+                await toggleTheme();
+                setShowProfileMenu(false);
+              }}
+            >
+              <Ionicons
+                name={theme === "light" ? "moon-outline" : "sunny-outline"}
+                size={18}
+                color={textColor}
+              />
+              <Text style={[styles.menuItemText, { color: textColor }]}>
+                {theme === "light"
+                  ? "Switch to Dark Mode"
+                  : "Switch to Light Mode"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.menuItem}
+              onPress={async () => {
+                setShowProfileMenu(false);
+                await handleLogout();
+              }}
+            >
+              <Ionicons name="log-out-outline" size={18} color={textColor} />
+              <Text style={[styles.menuItemText, { color: textColor }]}>
+                Logout
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
 
       <View style={styles.content}>
         <Text style={[styles.title, { color: textColor }]}>Wordle</Text>
@@ -87,13 +154,18 @@ export default function PlayPage() {
             <TouchableOpacity
               style={[
                 styles.modeButton,
-                mode === "SINGLE" && styles.modeButtonActive,
+                { borderColor: palette.green },
+                mode === "SINGLE" && [
+                  styles.modeButtonActive,
+                  { backgroundColor: palette.green },
+                ],
               ]}
               onPress={() => setMode("SINGLE")}
             >
               <Text
                 style={[
                   styles.modeButtonText,
+                  { color: palette.green },
                   mode === "SINGLE" && styles.modeButtonTextActive,
                 ]}
               >
@@ -103,13 +175,18 @@ export default function PlayPage() {
             <TouchableOpacity
               style={[
                 styles.modeButton,
-                mode === "MULTIPLAYER" && styles.modeButtonActive,
+                { borderColor: palette.green },
+                mode === "MULTIPLAYER" && [
+                  styles.modeButtonActive,
+                  { backgroundColor: palette.green },
+                ],
               ]}
               onPress={() => setMode("MULTIPLAYER")}
             >
               <Text
                 style={[
                   styles.modeButtonText,
+                  { color: palette.green },
                   mode === "MULTIPLAYER" && styles.modeButtonTextActive,
                 ]}
               >
@@ -120,7 +197,11 @@ export default function PlayPage() {
         </View>
 
         <TouchableOpacity
-          style={[styles.playButton, isStarting && styles.playButtonDisabled]}
+          style={[
+            styles.playButton,
+            { backgroundColor: palette.green },
+            isStarting && styles.playButtonDisabled,
+          ]}
           onPress={handleStartGame}
           disabled={isStarting}
         >
@@ -153,12 +234,53 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  logoutButton: {
+  menuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 80,
+  },
+  profileArea: {
     position: "absolute",
     top: 50,
     right: 20,
     zIndex: 100,
+    alignItems: "flex-end",
+  },
+  profileButton: {
     padding: 8,
+    zIndex: 102,
+  },
+  profileMenu: {
+    position: "absolute",
+    top: 46,
+    right: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 220,
+    paddingVertical: 8,
+    ...StyleSheet.flatten(
+      Platform.select({
+        ios: {
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.2,
+          shadowRadius: 10,
+        },
+        android: {
+          elevation: 8,
+        },
+      }),
+    ),
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  menuItemText: {
+    fontSize: 14,
+    fontFamily: "FrankRuhlLibre_500Medium",
   },
   content: {
     flex: 1,
@@ -179,7 +301,6 @@ const styles = StyleSheet.create({
     fontFamily: "FrankRuhlLibre_500Medium",
   },
   playButton: {
-    backgroundColor: Colors.light.green,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -234,16 +355,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.light.green,
     backgroundColor: "transparent",
   },
   modeButtonActive: {
-    backgroundColor: Colors.light.green,
+    borderColor: "transparent",
   },
   modeButtonText: {
     fontSize: 14,
     fontFamily: "FrankRuhlLibre_700Bold",
-    color: Colors.light.green,
   },
   modeButtonTextActive: {
     color: "#fff",

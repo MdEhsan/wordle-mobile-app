@@ -1,8 +1,18 @@
 import OutlinedButton from "@/components/buttons/outlined";
 import { ThemedText } from "@/components/themed-text";
+import { Colors } from "@/constants/Color";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
-import { Modal, Platform, StyleSheet, TextInput, View } from "react-native";
+import {
+  Keyboard,
+  Modal,
+  Platform,
+  StyleSheet,
+  TextInput,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
 import { LOGIN_LABEL } from "../label";
 import { UsernameModalProps } from "./types";
 
@@ -12,6 +22,8 @@ export const UsernameModal = ({
   isLoading = false,
   errorMessage = "",
 }: UsernameModalProps) => {
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? "light"];
   const [username, setUsername] = useState("");
   const [localError, setLocalError] = useState("");
 
@@ -36,7 +48,7 @@ export const UsernameModal = ({
     // Allow only alphanumeric and underscore
     if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
       setLocalError(
-        LOGIN_LABEL.ERROR_MESSAGE.USERNAME_VALIDATION.ALLOWED_CHARACTERS
+        LOGIN_LABEL.ERROR_MESSAGE.USERNAME_VALIDATION.ALLOWED_CHARACTERS,
       );
       return;
     }
@@ -52,61 +64,77 @@ export const UsernameModal = ({
       animationType="fade"
       onRequestClose={() => {}}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.iconCircle}>
-            <MaterialCommunityIcons
-              name="account-plus"
-              size={24}
-              color="white"
-            />
-          </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View
+          style={[
+            styles.modalOverlay,
+            { backgroundColor: palette.modalOverlay },
+          ]}
+        >
+          <View
+            style={[styles.modalContent, { backgroundColor: palette.card }]}
+          >
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons
+                name="account-plus"
+                size={24}
+                color="white"
+              />
+            </View>
 
-          <ThemedText style={styles.modalTitle}>
-            {LOGIN_LABEL.CREATE_USERNAME}
-          </ThemedText>
-          <ThemedText style={styles.modalMessage}>
-            {LOGIN_LABEL.PLEASE_ENTER_USERNAME}
-          </ThemedText>
-
-          <View style={{ width: "100%", marginTop: 20 }}>
-            <ThemedText style={styles.label}>
+            <ThemedText style={[styles.modalTitle, { color: palette.icon }]}>
               {LOGIN_LABEL.CREATE_USERNAME}
             </ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                localError || errorMessage ? styles.inputError : null,
-              ]}
-              placeholder={LOGIN_LABEL.ENTER_USERNAME_PLACEHOLDER}
-              placeholderTextColor="#81C784"
-              value={username}
-              onChangeText={(text) => {
-                setUsername(text);
-                if (localError) setLocalError("");
-              }}
-              maxLength={20}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!isLoading}
-            />
+            <ThemedText
+              style={[styles.modalMessage, { color: palette.mutedText }]}
+            >
+              {LOGIN_LABEL.PLEASE_ENTER_USERNAME}
+            </ThemedText>
 
-            {(localError || errorMessage) && (
-              <ThemedText style={styles.errorText}>
-                {localError || errorMessage}
+            <View style={{ width: "100%", marginTop: 20 }}>
+              <ThemedText style={[styles.label, { color: palette.text }]}>
+                {LOGIN_LABEL.CREATE_USERNAME}
               </ThemedText>
-            )}
-
-            <View style={{ marginTop: 16 }}>
-              <OutlinedButton
-                title="Create Username"
-                onPress={handleSubmit}
-                isLoading={isLoading}
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    borderColor: palette.border,
+                    backgroundColor: palette.card,
+                    color: palette.text,
+                  },
+                  localError || errorMessage ? styles.inputError : null,
+                ]}
+                placeholder={LOGIN_LABEL.ENTER_USERNAME_PLACEHOLDER}
+                placeholderTextColor={palette.mutedText}
+                value={username}
+                onChangeText={(text) => {
+                  setUsername(text);
+                  if (localError) setLocalError("");
+                }}
+                maxLength={20}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isLoading}
               />
+
+              {(localError || errorMessage) && (
+                <ThemedText style={styles.errorText}>
+                  {localError || errorMessage}
+                </ThemedText>
+              )}
+
+              <View style={{ marginTop: 16 }}>
+                <OutlinedButton
+                  title="Create Username"
+                  onPress={handleSubmit}
+                  isLoading={isLoading}
+                />
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -114,12 +142,10 @@ export const UsernameModal = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 30,
     alignItems: "center",
@@ -149,12 +175,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#2E7D32",
     marginBottom: 12,
   },
   modalMessage: {
     fontSize: 16,
-    color: "#388E3C",
     textAlign: "center",
     lineHeight: 24,
   },
@@ -162,18 +186,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 8,
     fontWeight: "500",
-    color: "#1B5E20",
     fontFamily: "FrankRuhlLibre_500Medium",
   },
   input: {
     height: 50,
     borderWidth: 2,
-    borderColor: "#66BB6A",
     borderRadius: 8,
     paddingHorizontal: 15,
     fontSize: 16,
-    backgroundColor: "#fff",
-    color: "#1B5E20",
     fontFamily: "FrankRuhlLibre_500Medium",
   },
   inputError: {
