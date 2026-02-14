@@ -75,6 +75,7 @@ const Page = () => {
 
   const router = useRouter();
   const auth = useAuth();
+  const profileName = auth.user?.username || "Player";
 
   const handleLogout = async () => {
     await auth.signOut();
@@ -419,6 +420,20 @@ const Page = () => {
               },
             ]}
           >
+            <View style={[styles.menuItem, styles.menuItemStatic]}>
+              <Ionicons name="person-outline" size={18} color={textColor} />
+              <Text
+                style={[styles.menuItemText, { color: textColor }]}
+                numberOfLines={1}
+              >
+                {profileName}
+              </Text>
+            </View>
+
+            <View
+              style={[styles.menuDivider, { backgroundColor: palette.border }]}
+            />
+
             <Pressable
               style={styles.menuItem}
               onPress={async () => {
@@ -622,9 +637,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  menuItemStatic: {
+    paddingRight: 18,
+  },
+  menuDivider: {
+    height: 1,
+    marginHorizontal: 12,
+    opacity: 0.4,
+  },
   menuItemText: {
     fontSize: 14,
     fontFamily: "FrankRuhlLibre_500Medium",
+    flexShrink: 1,
   },
   gameField: {
     alignItems: "center",

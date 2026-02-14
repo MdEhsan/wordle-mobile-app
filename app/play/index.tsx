@@ -3,7 +3,7 @@ import { Colors } from "@/constants/Color";
 import { useAppTheme } from "@/hooks/app-theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
-import { usePost } from "@/service/hooks";
+import { useFetch, usePost } from "@/service/hooks";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -11,19 +11,16 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
-
-type UIMode = "SINGLE" | "MULTIPLAYER";
-
-interface StartGameResponse {
-  gameId: string;
-  mode: UIMode;
-}
+import { PLAY_LABELS } from "./label";
+import StatsCard from "./stats-card";
+import { GameStatsResponse, StartGameResponse, UIMode } from "./types";
 
 export default function PlayPage() {
   const router = useRouter();
@@ -35,6 +32,53 @@ export default function PlayPage() {
   const { theme, toggleTheme } = useAppTheme();
   const [mode, setMode] = useState<UIMode>("SINGLE");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  let mockData = {
+    totalGames: 120,
+    totalWins: 70,
+    totalLosses: 50,
+    winPercentage: 58.33,
+    currentStreak: 4,
+    bestStreak: 11,
+    eloRating: 1620,
+  };
+
+  const { data: statsData, loading: statsLoading } =
+    useFetch<GameStatsResponse>(ENDPOINTS.GAME.GET_STATS);
+  const profileName =
+    statsData?.data?.username || auth.user?.username || "Player";
+
+  const stats = statsData?.data?.stats || mockData; // Use mock data if API data is not available
+  const statsItems = [
+    {
+      label: "Total Games",
+      value: statsLoading ? "--" : (stats?.totalGames ?? "--"),
+    },
+    {
+      label: "Total Wins",
+      value: statsLoading ? "--" : (stats?.totalWins ?? "--"),
+    },
+    {
+      label: "Total Losses",
+      value: statsLoading ? "--" : (stats?.totalLosses ?? "--"),
+    },
+    {
+      label: "Win Percentage",
+      value: statsLoading
+        ? "--"
+        : stats?.winPercentage !== undefined
+          ? `${stats.winPercentage}%`
+          : "--",
+    },
+    {
+      label: "Current Streak",
+      value: statsLoading ? "--" : (stats?.currentStreak ?? "--"),
+    },
+    {
+      label: "Best Streak",
+      value: statsLoading ? "--" : (stats?.bestStreak ?? "--"),
+    },
+  ];
 
   const { mutate: startGame, loading: isStarting } = usePost<
     StartGameResponse,
@@ -105,6 +149,20 @@ export default function PlayPage() {
               },
             ]}
           >
+            <View style={[styles.menuItem, styles.menuItemStatic]}>
+              <Ionicons name="person-outline" size={18} color={textColor} />
+              <Text
+                style={[styles.menuItemText, { color: textColor }]}
+                numberOfLines={1}
+              >
+                {profileName}
+              </Text>
+            </View>
+
+            <View
+              style={[styles.menuDivider, { backgroundColor: palette.border }]}
+            />
+
             <Pressable
               style={styles.menuItem}
               onPress={async () => {
@@ -119,8 +177,8 @@ export default function PlayPage() {
               />
               <Text style={[styles.menuItemText, { color: textColor }]}>
                 {theme === "light"
-                  ? "Switch to Dark Mode"
-                  : "Switch to Light Mode"}
+                  ? PLAY_LABELS.BUTTON_LABEL.DARK_MODE
+                  : PLAY_LABELS.BUTTON_LABEL.LIGHT_MODE}
               </Text>
             </Pressable>
 
@@ -133,22 +191,48 @@ export default function PlayPage() {
             >
               <Ionicons name="log-out-outline" size={18} color={textColor} />
               <Text style={[styles.menuItemText, { color: textColor }]}>
-                Logout
+                {PLAY_LABELS.BUTTON_LABEL.LOGOUT}
               </Text>
             </Pressable>
           </View>
         ) : null}
       </View>
 
-      <View style={styles.content}>
-        <Text style={[styles.title, { color: textColor }]}>Wordle</Text>
-        <Text style={[styles.subtitle, { color: textColor }]}>
-          Ready to test your word skills?
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.title, { color: textColor }]}>
+          {PLAY_LABELS.TTTLE}
         </Text>
+        <Text style={[styles.subtitle, { color: textColor }]}>
+          {PLAY_LABELS.GAME_INTRO}
+        </Text>
+
+        <View style={styles.statsSection}>
+          <View style={styles.statsRow}>
+            {statsItems.slice(0, 3).map((item) => (
+              <StatsCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+              />
+            ))}
+          </View>
+          <View style={styles.statsRow}>
+            {statsItems.slice(3, 6).map((item) => (
+              <StatsCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+              />
+            ))}
+          </View>
+        </View>
 
         <View style={styles.modeContainer}>
           <Text style={[styles.modeLabel, { color: textColor }]}>
-            Choose mode
+            {PLAY_LABELS.CHOOSE_MODE}
           </Text>
           <View style={styles.modeOptions}>
             <TouchableOpacity
@@ -169,7 +253,7 @@ export default function PlayPage() {
                   mode === "SINGLE" && styles.modeButtonTextActive,
                 ]}
               >
-                Single
+                {PLAY_LABELS.MODE.SINGLE}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -190,7 +274,7 @@ export default function PlayPage() {
                   mode === "MULTIPLAYER" && styles.modeButtonTextActive,
                 ]}
               >
-                Multiplayer
+                {PLAY_LABELS.MODE.MULTIPLAYER}
               </Text>
             </TouchableOpacity>
           </View>
@@ -217,13 +301,13 @@ export default function PlayPage() {
 
         <View style={styles.infoContainer}>
           <Text style={[styles.infoText, { color: textColor }]}>
-            Guess the word in 6 tries
+            {PLAY_LABELS.GAME_RULE.RULE1}
           </Text>
           <Text style={[styles.infoText, { color: textColor }]}>
-            Each guess must be a valid word
+            {PLAY_LABELS.GAME_RULE.RULE2}
           </Text>
         </View>
-      </View>
+      </ScrollView>
 
       <Toast />
     </View>
@@ -278,15 +362,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  menuItemStatic: {
+    paddingRight: 18,
+  },
+  menuDivider: {
+    height: 1,
+    marginHorizontal: 12,
+    opacity: 0.4,
+  },
   menuItemText: {
     fontSize: 14,
     fontFamily: "FrankRuhlLibre_500Medium",
+    flexShrink: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+    paddingTop: 80,
+    paddingBottom: 24,
+  },
+  statsSection: {
+    width: "100%",
+    maxWidth: 560,
+    gap: 10,
+    marginBottom: 24,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
   },
   title: {
     fontSize: 64,
