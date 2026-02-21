@@ -34,67 +34,107 @@ const OnScreenKeyboard = ({
 }: OnScreenKeyboardProps) => {
   const colorScheme = useColorScheme();
   const palette = Colors[colorScheme ?? "light"];
-  const { width } = useWindowDimensions();
-  const keyWidth = Platform.OS === "web" ? 58 : (width - 60) / keys[0].length;
-  const keyHeight = 60;
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 380 || height < 760;
+  const rowGap = isCompact ? 4 : 6;
+  const keyGap = isCompact ? 3 : 4;
+  const sidePadding = isCompact ? 12 : 16;
+  const keyboardWidth = Math.min(520, width - sidePadding * 2);
+  const specialRatio = isCompact ? 1.22 : 1.35;
+  const keyHeight = isCompact ? 48 : 56;
 
   const isSpecialKey = (key: string) => key === ENTER || key === BACKSPACE;
 
   const isInLetters = (key: string) =>
     [...greenLetters, ...yellowLetters, ...grayLetters].includes(key);
 
+  const getWidthsForRow = (row: string[]) => {
+    if (Platform.OS === "web" && width > 768) {
+      return {
+        normalWidth: 58,
+        specialWidth: 58 * specialRatio,
+      };
+    }
+
+    const specialCount = row.filter((key) => isSpecialKey(key)).length;
+    const normalCount = row.length - specialCount;
+    const totalUnits = normalCount + specialCount * specialRatio;
+    const availableWidth = keyboardWidth - keyGap * (row.length - 1);
+    const normalWidth = Math.floor(availableWidth / totalUnits);
+
+    return {
+      normalWidth,
+      specialWidth: Math.floor(normalWidth * specialRatio),
+    };
+  };
+
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          marginTop: isCompact ? 5 : 5,
+          gap: rowGap,
+          width: keyboardWidth,
+          maxWidth: "100%",
+        },
+      ]}
+    >
       {keys.map((row, rowIndex) => (
-        <View key={`row-${rowIndex}`} style={styles.row}>
-          {row.map((key, keyIndex) => (
-            <Pressable
-              onPress={() => onKeyPressed(key)}
-              key={`key-${key}`}
-              style={({ pressed }) => [
-                styles.key,
-                {
-                  width: keyWidth,
-                  height: keyHeight,
-                  backgroundColor: palette.keyDefault,
-                },
-                isSpecialKey(key) && { width: keyWidth * 1.5 },
-                pressed && { backgroundColor: "#868686" },
-                {
-                  backgroundColor: greenLetters.includes(key)
-                    ? palette.green
-                    : yellowLetters.includes(key)
-                      ? palette.yellow
-                      : grayLetters.includes(key)
-                        ? palette.gray
-                        : palette.keyDefault,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.keyText,
-                  { color: palette.keyText },
-                  key === "ENTER" && { fontSize: 12 },
-                  isInLetters(key) && { color: "#fff" },
+        <View key={`row-${rowIndex}`} style={[styles.row, { gap: keyGap }]}>
+          {row.map((key, keyIndex) => {
+            const { normalWidth, specialWidth } = getWidthsForRow(row);
+
+            return (
+              <Pressable
+                onPress={() => onKeyPressed(key)}
+                key={`key-${key}`}
+                style={({ pressed }) => [
+                  styles.key,
+                  {
+                    width: normalWidth,
+                    height: keyHeight,
+                    backgroundColor: palette.keyDefault,
+                  },
+                  isSpecialKey(key) && { width: specialWidth },
+                  pressed && { backgroundColor: "#868686" },
+                  {
+                    backgroundColor: greenLetters.includes(key)
+                      ? palette.green
+                      : yellowLetters.includes(key)
+                        ? palette.yellow
+                        : grayLetters.includes(key)
+                          ? palette.gray
+                          : palette.keyDefault,
+                  },
                 ]}
               >
-                {isSpecialKey(key) ? (
-                  key === ENTER ? (
-                    "ENTER"
+                <Text
+                  style={[
+                    styles.keyText,
+                    { fontSize: isCompact ? 16 : 20 },
+                    { color: palette.keyText },
+                    key === "ENTER" && { fontSize: 12 },
+                    isInLetters(key) && { color: "#fff" },
+                  ]}
+                >
+                  {isSpecialKey(key) ? (
+                    key === ENTER ? (
+                      "ENTER"
+                    ) : (
+                      <Ionicons
+                        name="backspace-outline"
+                        size={isCompact ? 20 : 24}
+                        color={palette.keyText}
+                      />
+                    )
                   ) : (
-                    <Ionicons
-                      name="backspace-outline"
-                      size={24}
-                      color={palette.keyText}
-                    />
-                  )
-                ) : (
-                  key.toUpperCase()
-                )}
-              </Text>
-            </Pressable>
-          ))}
+                    key.toUpperCase()
+                  )}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       ))}
     </View>
@@ -103,14 +143,11 @@ const OnScreenKeyboard = ({
 export default OnScreenKeyboard;
 const styles = StyleSheet.create({
   container: {
-    marginTop: 40,
-    gap: 6,
     alignSelf: "center",
   },
   row: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 4,
   },
   key: {
     alignItems: "center",

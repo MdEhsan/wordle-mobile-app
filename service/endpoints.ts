@@ -37,8 +37,8 @@ export const ENDPOINTS = {
 
   //matchmaking endpoints
   MATCHMAKING: {
-    FIND_MATCH: "/api/matchmaking/search",
-    ASSIGN_BOT: "/api/matchmaking/assign-bot",
+    FIND_MATCH: "/matchmaking/search",
+    ASSIGN_BOT: "/matchmaking/assign-bot",
   },
 } as const;
 

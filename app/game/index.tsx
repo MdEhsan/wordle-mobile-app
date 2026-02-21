@@ -7,19 +7,18 @@ import { Colors } from "@/constants/Color";
 import { useAppTheme } from "@/hooks/app-theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
-import { useFetch } from "@/service/hooks/useFetch";
 import { useMutation } from "@/service/hooks/useMutation";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Animated, {
@@ -31,11 +30,7 @@ import Animated, {
   withTiming,
   ZoomIn,
 } from "react-native-reanimated";
-import {
-  DailyWordResponse,
-  ValidateWordRequest,
-  ValidateWordResponse,
-} from "./types";
+import { ValidateWordRequest, ValidateWordResponse } from "./types";
 
 const ROWS = 6;
 
@@ -56,6 +51,7 @@ const Page = () => {
   const textColor = palette.text;
   const grayColor = palette.gray;
   const { theme, toggleTheme } = useAppTheme();
+  const { width, height } = useWindowDimensions();
 
   const [rows, setRows] = useState<string[][]>(
     new Array(ROWS).fill(new Array(5).fill("")),
@@ -82,11 +78,11 @@ const Page = () => {
     router.replace("/auth/login");
   };
 
-  const {
-    data: dailyWordData,
-    loading: loadingWord,
-    error: wordError,
-  } = useFetch<DailyWordResponse>(ENDPOINTS.WORDLE.GET_DAILY_WORD);
+  // const {
+  //   data: dailyWordData,
+  //   loading: loadingWord,
+  //   error: wordError,
+  // } = useFetch<DailyWordResponse>(ENDPOINTS.WORDLE.GET_DAILY_WORD);
 
   const { mutate: validateWord, loading: validatingWord } = useMutation<
     ValidateWordResponse,
@@ -100,13 +96,20 @@ const Page = () => {
     }
   }, [auth.isAuthenticated, auth.isLoading]);
 
-  useEffect(() => {
-    if (dailyWordData?.success && dailyWordData?.data?.word) {
-      setWord(dailyWordData?.data?.word.toLowerCase());
-    }
-  }, [dailyWordData]);
+  // useEffect(() => {
+  //   if (dailyWordData?.success && dailyWordData?.data?.word) {
+  //     setWord(dailyWordData?.data?.word.toLowerCase());
+  //   }
+  // }, [dailyWordData]);
 
   const wordLetters = word ? word.split("") : [];
+  const isCompactHeight = height < 760;
+  const tileGap = width < 360 ? 6 : 8;
+  const boardMaxWidth = Math.min(width - 28, 380);
+  const tileSize = Math.max(
+    46,
+    Math.min(62, (boardMaxWidth - tileGap * 4) / 5),
+  );
 
   const setCurCol = (data: number) => {
     colStateRef.current = data;
@@ -114,9 +117,9 @@ const Page = () => {
   };
 
   const addKey = (key: string) => {
-    if (!word || loadingWord) {
-      return;
-    }
+    // if (!word || loadingWord) {
+    //   return;
+    // }
 
     const newRows = [...rows.map((row) => [...row])];
 
@@ -469,17 +472,17 @@ const Page = () => {
         ) : null}
       </View>
 
-      {loadingWord && (
+      {/* {loadingWord && (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={textColor} />
           <Text style={[styles.statusText, { color: textColor }]}>
             Loading today's word...
           </Text>
         </View>
-      )}
+      )} */}
 
       {/* Error State */}
-      {wordError && !loadingWord && (
+      {/* {wordError && !loadingWord && (
         <View style={styles.centerContent}>
           <Ionicons name="alert-circle-outline" size={48} color="red" />
           <Text style={[styles.statusText, { color: textColor }]}>
@@ -489,60 +492,74 @@ const Page = () => {
             {wordError.message}
           </Text>
         </View>
-      )}
+      )} */}
 
       {/* Game Content */}
-      {!loadingWord && !wordError && word && (
-        <>
-          <View style={styles.gameField}>
-            {rows.map((row, rowIndex) => (
-              <Animated.View
-                style={[styles.gameFieldRow, rowStyles[rowIndex]]}
-                key={`row-${rowIndex}`}
-              >
-                {row.map((cell, cellIndex) => (
+      {/* {!loadingWord && !wordError && word && ( */}
+      <View
+        style={[styles.gameContent, { paddingTop: isCompactHeight ? 44 : 56 }]}
+      >
+        <View
+          style={[
+            styles.gameField,
+            { gap: tileGap, marginTop: isCompactHeight ? 6 : 50 },
+          ]}
+        >
+          {rows.map((row, rowIndex) => (
+            <Animated.View
+              style={[
+                styles.gameFieldRow,
+                { gap: tileGap },
+                rowStyles[rowIndex],
+              ]}
+              key={`row-${rowIndex}`}
+            >
+              {row.map((cell, cellIndex) => (
+                <Animated.View
+                  entering={ZoomIn.delay(50 * cellIndex)}
+                  key={`cell-${rowIndex}-${cellIndex}`}
+                >
                   <Animated.View
-                    entering={ZoomIn.delay(50 * cellIndex)}
-                    key={`cell-${rowIndex}-${cellIndex}`}
+                    style={[
+                      styles.cell,
+                      {
+                        borderColor: palette.border,
+                        backgroundColor: palette.card,
+                        width: tileSize,
+                        height: tileSize,
+                      },
+                      // {
+                      //   borderColor: getBorderColor(cell, rowIndex, cellIndex),
+                      //   backgroundColor: getCellColor(cell, rowIndex, cellIndex),
+                      // },
+                      tileStyles[rowIndex][cellIndex],
+                    ]}
                   >
-                    <Animated.View
+                    <Animated.Text
                       style={[
-                        styles.cell,
+                        styles.cellText,
+                        { fontSize: tileSize * 0.48 },
                         {
-                          borderColor: palette.border,
-                          backgroundColor: palette.card,
+                          color: curRow > rowIndex ? "#fff" : textColor,
                         },
-                        // {
-                        //   borderColor: getBorderColor(cell, rowIndex, cellIndex),
-                        //   backgroundColor: getCellColor(cell, rowIndex, cellIndex),
-                        // },
-                        tileStyles[rowIndex][cellIndex],
                       ]}
                     >
-                      <Animated.Text
-                        style={[
-                          styles.cellText,
-                          {
-                            color: curRow > rowIndex ? "#fff" : textColor,
-                          },
-                        ]}
-                      >
-                        {cell}
-                      </Animated.Text>
-                    </Animated.View>
+                      {cell}
+                    </Animated.Text>
                   </Animated.View>
-                ))}
-              </Animated.View>
-            ))}
-          </View>
-          <OnScreenKeyboard
-            onKeyPressed={addKey}
-            greenLetters={greenLetters}
-            yellowLetters={yellowLetters}
-            grayLetters={grayLetters}
-          />
-        </>
-      )}
+                </Animated.View>
+              ))}
+            </Animated.View>
+          ))}
+        </View>
+        <OnScreenKeyboard
+          onKeyPressed={addKey}
+          greenLetters={greenLetters}
+          yellowLetters={yellowLetters}
+          grayLetters={grayLetters}
+        />
+      </View>
+      {/* )} */}
 
       <Modal
         visible={showSuccessModal}
@@ -585,7 +602,15 @@ export default Page;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingVertical: 40,
+    paddingTop: 10,
+    paddingBottom: 10,
+    overflow: "hidden",
+  },
+  gameContent: {
+    flex: 1,
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    overflow: "hidden",
   },
   backButton: {
     position: "absolute",
@@ -652,23 +677,17 @@ const styles = StyleSheet.create({
   },
   gameField: {
     alignItems: "center",
-    gap: 8,
-    marginTop: 60,
   },
   gameFieldRow: {
     flexDirection: "row",
-    gap: 8,
   },
   cell: {
     backgroundColor: "#fff",
-    width: 62,
-    height: 62,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
   },
   cellText: {
-    fontSize: 30,
     textTransform: "uppercase",
     fontWeight: "bold",
   },

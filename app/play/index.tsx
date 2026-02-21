@@ -4,9 +4,10 @@ import { useAppTheme } from "@/hooks/app-theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
 import { useFetch, usePost } from "@/service/hooks";
+import socketService, { SocketConnectionState } from "@/service/socket.service";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -32,6 +33,10 @@ export default function PlayPage() {
   const { theme, toggleTheme } = useAppTheme();
   const [mode, setMode] = useState<UIMode>("SINGLE");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [socketStatus, setSocketStatus] =
+    useState<SocketConnectionState>("idle");
+  const sessionIdRef = useRef<string | null>(null);
 
   let mockData = {
     totalGames: 120,
@@ -52,19 +57,19 @@ export default function PlayPage() {
   const stats = statsData?.data?.stats || mockData; // Use mock data if API data is not available
   const statsItems = [
     {
-      label: "Total Games",
+      label: PLAY_LABELS.STATS_CARD.TOTAL_GAMES,
       value: statsLoading ? "--" : (stats?.totalGames ?? "--"),
     },
     {
-      label: "Total Wins",
+      label: PLAY_LABELS.STATS_CARD.TOTAL_WINS,
       value: statsLoading ? "--" : (stats?.totalWins ?? "--"),
     },
     {
-      label: "Total Losses",
+      label: PLAY_LABELS.STATS_CARD.TOTAL_LOSSES,
       value: statsLoading ? "--" : (stats?.totalLosses ?? "--"),
     },
     {
-      label: "Win Percentage",
+      label: PLAY_LABELS.STATS_CARD.WIN_PERCENTAGE,
       value: statsLoading
         ? "--"
         : stats?.winPercentage !== undefined
@@ -72,11 +77,11 @@ export default function PlayPage() {
           : "--",
     },
     {
-      label: "Current Streak",
+      label: PLAY_LABELS.STATS_CARD.CURRENT_STREAK,
       value: statsLoading ? "--" : (stats?.currentStreak ?? "--"),
     },
     {
-      label: "Best Streak",
+      label: PLAY_LABELS.STATS_CARD.BEST_STREAK,
       value: statsLoading ? "--" : (stats?.bestStreak ?? "--"),
     },
   ];
@@ -99,16 +104,192 @@ export default function PlayPage() {
     },
   });
 
+  const { mutate: findMatch, loading: isFindingMatch } = usePost(
+    ENDPOINTS.MATCHMAKING.FIND_MATCH,
+    {
+      onSuccess: async (data) => {
+        const sessionId = data?.data?.sessionId ?? "";
+        if (sessionId) {
+          router.push(`/game?sessionId=${sessionId}`);
+          return;
+        }
+        const resolvedSessionId = data?.data?.sessionId || null;
+        setSessionId(resolvedSessionId);
+
+        try {
+          socketService.connect({
+            token: auth.token ?? "",
+          });
+        } catch (socketError: any) {
+          Toast.show({
+            type: "error",
+            text1: "Socket connection failed",
+            text2: socketError?.message || PLAY_LABELS.TRY_AGAIN,
+            position: "bottom",
+            bottomOffset: 100,
+          });
+        }
+
+        const opponentType = data?.data?.opponentType;
+        if (
+          opponentType === "bot" &&
+          resolvedSessionId &&
+          mode.toLowerCase() === "multiplayer"
+        ) {
+          await assignBot({ sessionId: resolvedSessionId });
+          return;
+        }
+
+        Toast.show({
+          type: "success",
+          text1: PLAY_LABELS.MATCHMAKING.MATCHMAKING_STARTED,
+          text2: PLAY_LABELS.MATCHMAKING.SEARCHING_OPPONENT,
+          position: "bottom",
+          bottomOffset: 100,
+        });
+      },
+      onError: (error) => {
+        Toast.show({
+          type: "error",
+          text1: PLAY_LABELS.MATCHMAKING.ERROR,
+          text2: error.message || PLAY_LABELS.TRY_AGAIN,
+          position: "bottom",
+          bottomOffset: 100,
+        });
+      },
+    },
+  );
+
+  const { mutate: assignBot, loading: isAssigningBot } = usePost(
+    ENDPOINTS.MATCHMAKING.ASSIGN_BOT,
+    {
+      onSuccess: (data) => {
+        // const gameId = data?.data?.gameId || data?.gameId;
+        // if (gameId) {
+        //   router.push(`/game?gameId=${gameId}`);
+        //   return;
+        // }
+        console.log("Bot assigned, response:", data);
+
+        Toast.show({
+          type: "success",
+          text1: PLAY_LABELS.ASSIGN_BOT.BOT_ASSIGNED,
+          text2: PLAY_LABELS.ASSIGN_BOT.MATCH_READY,
+          position: "bottom",
+          bottomOffset: 100,
+        });
+      },
+      onError: (error) => {
+        Toast.show({
+          type: "error",
+          text1: PLAY_LABELS.ASSIGN_BOT.ERROR,
+          text2: error.message || PLAY_LABELS.TRY_AGAIN,
+          position: "bottom",
+          bottomOffset: 100,
+        });
+      },
+    },
+  );
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    const unsubscribeStatus = socketService.subscribeStatus((status) => {
+      setSocketStatus(status);
+    });
+
+    return () => {
+      unsubscribeStatus();
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = socketService.subscribe((payload) => {
+      const message = (payload || {}) as any;
+      const eventType = String(
+        message?.event || message?.type || message?.data?.event || "",
+      ).toLowerCase();
+      const gameId =
+        message?.data?.gameId || message?.gameId || message?.data?.matchId;
+      const incomingSessionId =
+        message?.data?.sessionId || message?.sessionId || null;
+
+      const isMatchReadyEvent =
+        eventType.includes("match") ||
+        eventType.includes("ready") ||
+        eventType.includes("start") ||
+        message?.data?.matchFound === true ||
+        message?.matchFound === true;
+
+      if (!isMatchReadyEvent || !gameId) {
+        return;
+      }
+
+      const currentSessionId = sessionIdRef.current;
+      if (
+        currentSessionId &&
+        incomingSessionId &&
+        incomingSessionId !== currentSessionId
+      ) {
+        return;
+      }
+
+      router.push(`/game?gameId=${gameId}`);
+    });
+
+    return () => {
+      unsubscribe();
+      socketService.disconnect();
+    };
+  }, [router]);
+
   const handleLogout = async () => {
     await auth.signOut();
     router.replace("/auth/login");
   };
 
   const handleStartGame = async () => {
-    if (isStarting) {
+    if (isStarting || isFindingMatch || isAssigningBot) {
       return;
     }
-    await startGame({ mode });
+
+    const resolvedUserId = String(
+      auth.user?.id ||
+        auth.user?._id ||
+        auth.user?.userId ||
+        auth.user?.phone ||
+        auth.user?.username ||
+        "",
+    );
+
+    await findMatch({
+      userId: resolvedUserId,
+      eloRating: Number(stats?.eloRating ?? 0),
+      mode: mode.toLowerCase() === "single" ? "single_player" : "multiplayer",
+      gameType: "wordle",
+    });
+
+    // await startGame({ mode });
+  };
+
+  const showWaitingForMatch =
+    !!sessionId &&
+    mode.toLowerCase() === "multiplayer" &&
+    (isFindingMatch ||
+      isAssigningBot ||
+      socketStatus === "connecting" ||
+      socketStatus === "connected" ||
+      socketStatus === "reconnecting");
+
+  const socketStatusLabelMap: Record<SocketConnectionState, string> = {
+    idle: "Idle",
+    connecting: "Connecting",
+    connected: "Connected",
+    reconnecting: "Reconnecting",
+    disconnected: "Disconnected",
+    error: "Connection error",
   };
 
   return (
@@ -285,20 +466,39 @@ export default function PlayPage() {
           style={[
             styles.playButton,
             { backgroundColor: palette.green },
-            isStarting && styles.playButtonDisabled,
+            (isStarting || isFindingMatch || isAssigningBot) &&
+              styles.playButtonDisabled,
           ]}
           onPress={handleStartGame}
-          disabled={isStarting}
+          disabled={isStarting || isFindingMatch || isAssigningBot}
         >
-          {isStarting ? (
+          {isStarting || isFindingMatch || isAssigningBot ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Ionicons name="play" size={32} color="#fff" />
           )}
           <Text style={styles.playButtonText}>
-            {isStarting ? "Starting..." : "Play Game"}
+            {isStarting
+              ? PLAY_LABELS.STARTING
+              : isAssigningBot
+                ? PLAY_LABELS.ASSIGN_BOT.ASSIGNING_BOT
+                : isFindingMatch
+                  ? PLAY_LABELS.MATCHMAKING.FINDING_MATCH
+                  : PLAY_LABELS.PLAY_GAME}
           </Text>
         </TouchableOpacity>
+
+        {showWaitingForMatch ? (
+          <View style={styles.waitingContainer}>
+            <ActivityIndicator color={palette.green} size="small" />
+            <Text style={[styles.waitingTitle, { color: textColor }]}>
+              Waiting for opponent...
+            </Text>
+            <Text style={[styles.waitingSubText, { color: textColor }]}>
+              Socket: {socketStatusLabelMap[socketStatus]}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.infoContainer}>
           <Text style={[styles.infoText, { color: textColor }]}>
@@ -431,6 +631,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     fontFamily: "FrankRuhlLibre_700Bold",
+  },
+  waitingContainer: {
+    marginTop: 16,
+    alignItems: "center",
+    gap: 4,
+  },
+  waitingTitle: {
+    fontSize: 15,
+    fontFamily: "FrankRuhlLibre_700Bold",
+  },
+  waitingSubText: {
+    fontSize: 13,
+    opacity: 0.8,
+    fontFamily: "FrankRuhlLibre_500Medium",
   },
   infoContainer: {
     marginTop: 48,
