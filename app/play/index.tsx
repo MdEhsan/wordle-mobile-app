@@ -1,4 +1,5 @@
 import useAuth from "@/auth-protect/useAuth";
+import Profile from "@/components/profile";
 import { Colors } from "@/constants/Color";
 import { useAppTheme } from "@/hooks/app-theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -10,7 +11,6 @@ import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -322,61 +322,10 @@ export default function PlayPage() {
         </Pressable>
 
         {showProfileMenu ? (
-          <View
-            style={[
-              styles.profileMenu,
-              {
-                backgroundColor: palette.card,
-                borderColor: palette.border,
-              },
-            ]}
-          >
-            <View style={[styles.menuItem, styles.menuItemStatic]}>
-              <Ionicons name="person-outline" size={18} color={textColor} />
-              <Text
-                style={[styles.menuItemText, { color: textColor }]}
-                numberOfLines={1}
-              >
-                {profileName}
-              </Text>
-            </View>
-
-            <View
-              style={[styles.menuDivider, { backgroundColor: palette.border }]}
-            />
-
-            <Pressable
-              style={styles.menuItem}
-              onPress={async () => {
-                await toggleTheme();
-                setShowProfileMenu(false);
-              }}
-            >
-              <Ionicons
-                name={theme === "light" ? "moon-outline" : "sunny-outline"}
-                size={18}
-                color={textColor}
-              />
-              <Text style={[styles.menuItemText, { color: textColor }]}>
-                {theme === "light"
-                  ? PLAY_LABELS.BUTTON_LABEL.DARK_MODE
-                  : PLAY_LABELS.BUTTON_LABEL.LIGHT_MODE}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.menuItem}
-              onPress={async () => {
-                setShowProfileMenu(false);
-                await handleLogout();
-              }}
-            >
-              <Ionicons name="log-out-outline" size={18} color={textColor} />
-              <Text style={[styles.menuItemText, { color: textColor }]}>
-                {PLAY_LABELS.BUTTON_LABEL.LOGOUT}
-              </Text>
-            </Pressable>
-          </View>
+          <Profile
+            profileName={profileName}
+            setShowProfileMenu={setShowProfileMenu}
+          />
         ) : null}
       </View>
 
@@ -533,48 +482,6 @@ const styles = StyleSheet.create({
   profileButton: {
     padding: 8,
     zIndex: 102,
-  },
-  profileMenu: {
-    position: "absolute",
-    top: 46,
-    right: 0,
-    borderRadius: 12,
-    borderWidth: 1,
-    minWidth: 220,
-    paddingVertical: 8,
-    ...StyleSheet.flatten(
-      Platform.select({
-        ios: {
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.2,
-          shadowRadius: 10,
-        },
-        android: {
-          elevation: 8,
-        },
-      }),
-    ),
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  menuItemStatic: {
-    paddingRight: 18,
-  },
-  menuDivider: {
-    height: 1,
-    marginHorizontal: 12,
-    opacity: 0.4,
-  },
-  menuItemText: {
-    fontSize: 14,
-    fontFamily: "FrankRuhlLibre_500Medium",
-    flexShrink: 1,
   },
   content: {
     flexGrow: 1,
