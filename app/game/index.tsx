@@ -34,16 +34,6 @@ import { ValidateWordRequest, ValidateWordResponse } from "./types";
 
 const ROWS = 6;
 
-const allWords = [
-  "apple",
-  "bread",
-  "crane",
-  "drape",
-  "eagle",
-  "flame",
-  "grape",
-];
-
 const Page = () => {
   const colorScheme = useColorScheme();
   const palette = Colors[colorScheme ?? "light"];
