@@ -73,7 +73,7 @@ const OnScreenKeyboard = ({
       style={[
         styles.container,
         {
-          marginTop: isCompact ? 5 : 5,
+          marginTop: isCompact ? 5 : 60,
           gap: rowGap,
           width: keyboardWidth,
           maxWidth: "100%",

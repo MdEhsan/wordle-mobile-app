@@ -9,7 +9,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
 import { useMutation } from "@/service/hooks/useMutation";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Modal,
@@ -66,10 +66,14 @@ const Page = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [word, setWord] = useState<string>("");
+  const [feedbackByRow, setFeedbackByRow] = useState<string[][]>(
+    Array.from({ length: ROWS }, () => []),
+  );
 
   const colStateRef = useRef(curCol);
 
   const router = useRouter();
+  const { sessionId } = useLocalSearchParams();
   const auth = useAuth();
   const profileName = auth.user?.username || "Player";
 
@@ -78,16 +82,10 @@ const Page = () => {
     router.replace("/auth/login");
   };
 
-  // const {
-  //   data: dailyWordData,
-  //   loading: loadingWord,
-  //   error: wordError,
-  // } = useFetch<DailyWordResponse>(ENDPOINTS.WORDLE.GET_DAILY_WORD);
-
   const { mutate: validateWord, loading: validatingWord } = useMutation<
     ValidateWordResponse,
     ValidateWordRequest
-  >("post", ENDPOINTS.WORDLE.VALIDATE_WORD);
+  >("post", ENDPOINTS.GAME.SUBMIT_GUESS);
 
   // Redirect to login if not authenticated (after loading completes)
   useEffect(() => {
@@ -96,13 +94,6 @@ const Page = () => {
     }
   }, [auth.isAuthenticated, auth.isLoading]);
 
-  // useEffect(() => {
-  //   if (dailyWordData?.success && dailyWordData?.data?.word) {
-  //     setWord(dailyWordData?.data?.word.toLowerCase());
-  //   }
-  // }, [dailyWordData]);
-
-  const wordLetters = word ? word.split("") : [];
   const isCompactHeight = height < 760;
   const tileGap = width < 360 ? 6 : 8;
   const boardMaxWidth = Math.min(width - 28, 380);
@@ -111,16 +102,26 @@ const Page = () => {
     Math.min(62, (boardMaxWidth - tileGap * 4) / 5),
   );
 
+  const getFeedbackColor = (status?: string) => {
+    const normalizedStatus = String(status || "").toLowerCase();
+    if (normalizedStatus === "correct") {
+      return palette.green;
+    }
+    if (normalizedStatus === "present") {
+      return palette.yellow;
+    }
+    if (normalizedStatus === "absent") {
+      return grayColor;
+    }
+    return null;
+  };
+
   const setCurCol = (data: number) => {
     colStateRef.current = data;
     _setCurCol(data);
   };
 
   const addKey = (key: string) => {
-    // if (!word || loadingWord) {
-    //   return;
-    // }
-
     const newRows = [...rows.map((row) => [...row])];
 
     if (key === "ENTER") {
@@ -146,29 +147,43 @@ const Page = () => {
   };
 
   const checkWord = async () => {
-    const currentWord = rows[curRow].join("");
-
-    if (!word || word.length === 0) {
+    if (validatingWord) {
       return;
     }
 
-    if (currentWord.length < word.length) {
+    const currentWord = rows[curRow].join("");
+
+    if (currentWord.length < 5) {
       shakeRow();
       return;
     }
 
-    try {
-      const validationResult = await validateWord({ word: currentWord });
+    if (!sessionId) {
+      shakeRow();
+      return;
+    }
 
-      if (!validationResult?.isValid) {
+    let validationResult: any = null;
+
+    try {
+      validationResult = await validateWord({
+        sessionId: (sessionId as string) ?? "",
+        guess: currentWord,
+      });
+
+      const isValidGuess =
+        validationResult?.isValid ??
+        validationResult?.data?.isValid ??
+        validationResult?.data?.valid ??
+        validationResult?.valid;
+
+      if (isValidGuess === false) {
         shakeRow();
         return;
       }
     } catch (error) {
-      if (!allWords.includes(currentWord)) {
-        shakeRow();
-        return;
-      }
+      shakeRow();
+      return;
     }
 
     flipRow();
@@ -177,22 +192,74 @@ const Page = () => {
     const newYellow: string[] = [];
     const newGray: string[] = [];
 
-    currentWord.split("").forEach((letter, index) => {
-      if (letter === wordLetters[index]) {
-        newGreen.push(letter);
-      } else if (wordLetters.includes(letter)) {
-        newYellow.push(letter);
-      } else {
-        newGray.push(letter);
-      }
-    });
+    const letterStatuses =
+      validationResult?.data?.letterStatuses ||
+      validationResult?.data?.feedback ||
+      validationResult?.feedback ||
+      [];
+
+    const normalizedFeedback =
+      Array.isArray(letterStatuses) && letterStatuses.length === 5
+        ? letterStatuses.map((status) => String(status || "").toLowerCase())
+        : [];
+
+    if (normalizedFeedback.length === 5) {
+      setFeedbackByRow((prev) => {
+        const next = [...prev];
+        next[curRow] = normalizedFeedback;
+        return next;
+      });
+    }
+
+    if (normalizedFeedback.length === 5) {
+      currentWord.split("").forEach((letter, index) => {
+        const status = normalizedFeedback[index];
+        if (status === "correct" || status === "green") {
+          newGreen.push(letter);
+        } else if (status === "present" || status === "yellow") {
+          newYellow.push(letter);
+        } else {
+          newGray.push(letter);
+        }
+      });
+    } else {
+      currentWord.split("").forEach((letter) => {
+        if (greenLetters.includes(letter)) {
+          newGreen.push(letter);
+        } else if (yellowLetters.includes(letter)) {
+          newYellow.push(letter);
+        } else {
+          newGray.push(letter);
+        }
+      });
+    }
 
     setGreenLetters([...greenLetters, ...newGreen]);
     setYellowLetters([...yellowLetters, ...newYellow]);
     setGrayLetters([...grayLetters, ...newGray]);
 
+    const isCorrectGuess =
+      validationResult?.data?.isCorrect === true ||
+      validationResult?.isCorrect === true ||
+      validationResult?.correct === true ||
+      validationResult?.data?.status === "won" ||
+      validationResult?.status === "won";
+
+    const targetWordFromApi =
+      validationResult?.data?.word ||
+      validationResult?.data?.targetWord ||
+      validationResult?.word ||
+      validationResult?.targetWord ||
+      "";
+
+    const isGameOver =
+      validationResult?.data?.gameOver === true ||
+      validationResult?.gameOver === true ||
+      validationResult?.data?.status === "lost" ||
+      validationResult?.status === "lost";
+
     setTimeout(() => {
-      if (currentWord === word) {
+      if (isCorrectGuess) {
         const excitingMessages = [
           "🎉 Genius! You nailed it!",
           "🌟 Spectacular! You're a word wizard!",
@@ -204,12 +271,18 @@ const Page = () => {
         const randomMessage =
           excitingMessages[Math.floor(Math.random() * excitingMessages.length)];
         setSuccessMessage(randomMessage);
+        if (targetWordFromApi) {
+          setWord(String(targetWordFromApi));
+        }
         setShowSuccessModal(true);
-      } else if (curRow + 1 >= rows.length) {
+      } else if (isGameOver || curRow + 1 >= rows.length) {
+        if (targetWordFromApi) {
+          setWord(String(targetWordFromApi));
+        }
         console.log("GAME OVER");
       }
     }, 1500);
-    setCurRow(curRow + 1);
+    setCurRow((prev) => prev + 1);
     setCurCol(0);
   };
 
@@ -235,46 +308,22 @@ const Page = () => {
     };
   }, [curCol]);
 
-  // const getCellColor = (cell: string, rowIndex: number, cellIndex: number) => {
-  //   'worklet';
-  //   if (curRow > rowIndex) {
-  //     if (wordLetters[cellIndex] === cell) {
-  //       return Colors.light.green;
-  //     } else if (wordLetters.includes(cell)) {
-  //       return Colors.light.yellow;
-  //     } else {
-  //       return grayColor;
-  //     }
-  //   }
-  //   return 'transparent';
-  // };
-
-  // const getBorderColor = (cell: string, rowIndex: number, cellIndex: number) => {
-  //   if (curRow > rowIndex && cell !== '') {
-  //     return getCellColor(cell, rowIndex, cellIndex);
-  //   }
-  //   return Colors.light.gray;
-  // };
-
   // Animations
-  const setCellColor = (cell: string, rowIndex: number, cellIndex: number) => {
-    if (curRow >= rowIndex && wordLetters.length > 0) {
-      if (wordLetters[cellIndex] === cell) {
-        cellBackgrounds[rowIndex][cellIndex].value = withDelay(
-          cellIndex * 200,
-          withTiming(palette.green),
-        );
-      } else if (wordLetters.includes(cell)) {
-        cellBackgrounds[rowIndex][cellIndex].value = withDelay(
-          cellIndex * 200,
-          withTiming(palette.yellow),
-        );
-      } else {
-        cellBackgrounds[rowIndex][cellIndex].value = withDelay(
-          cellIndex * 200,
-          withTiming(grayColor),
-        );
-      }
+  const setCellColor = (_cell: string, rowIndex: number, cellIndex: number) => {
+    const status = feedbackByRow[rowIndex]?.[cellIndex];
+
+    if (curRow >= rowIndex && status) {
+      const color =
+        status === "correct"
+          ? palette.green
+          : status === "present"
+            ? palette.yellow
+            : grayColor;
+
+      cellBackgrounds[rowIndex][cellIndex].value = withDelay(
+        cellIndex * 200,
+        withTiming(color),
+      );
     } else {
       cellBackgrounds[rowIndex][cellIndex].value = withTiming("transparent", {
         duration: 100,
@@ -283,27 +332,23 @@ const Page = () => {
   };
 
   const setBorderColor = (
-    cell: string,
+    _cell: string,
     rowIndex: number,
     cellIndex: number,
   ) => {
-    if (curRow > rowIndex && cell !== "" && wordLetters.length > 0) {
-      if (wordLetters[cellIndex] === cell) {
-        cellBorders[rowIndex][cellIndex].value = withDelay(
-          cellIndex * 200,
-          withTiming(palette.green),
-        );
-      } else if (wordLetters.includes(cell)) {
-        cellBorders[rowIndex][cellIndex].value = withDelay(
-          cellIndex * 200,
-          withTiming(palette.yellow),
-        );
-      } else {
-        cellBorders[rowIndex][cellIndex].value = withDelay(
-          cellIndex * 200,
-          withTiming(grayColor),
-        );
-      }
+    const status = feedbackByRow[rowIndex]?.[cellIndex];
+    if (curRow > rowIndex && status) {
+      const color =
+        status === "correct"
+          ? palette.green
+          : status === "present"
+            ? palette.yellow
+            : grayColor;
+
+      cellBorders[rowIndex][cellIndex].value = withDelay(
+        cellIndex * 200,
+        withTiming(color),
+      );
     }
     return palette.gray;
   };
@@ -335,8 +380,6 @@ const Page = () => {
       useAnimatedStyle(() => {
         return {
           transform: [{ rotateX: `${tileRotates[index][tileIndex].value}deg` }],
-          borderColor: cellBorders[index][tileIndex].value,
-          backgroundColor: cellBackgrounds[index][tileIndex].value,
         };
       }),
     );
@@ -375,7 +418,7 @@ const Page = () => {
       setCellColor(cell, curRow - 1, cellIndex);
       setBorderColor(cell, curRow - 1, cellIndex);
     });
-  }, [curRow]);
+  }, [curRow, feedbackByRow]);
 
   return (
     <View style={[styles.container, { backgroundColor }]}>
@@ -472,30 +515,6 @@ const Page = () => {
         ) : null}
       </View>
 
-      {/* {loadingWord && (
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={textColor} />
-          <Text style={[styles.statusText, { color: textColor }]}>
-            Loading today's word...
-          </Text>
-        </View>
-      )} */}
-
-      {/* Error State */}
-      {/* {wordError && !loadingWord && (
-        <View style={styles.centerContent}>
-          <Ionicons name="alert-circle-outline" size={48} color="red" />
-          <Text style={[styles.statusText, { color: textColor }]}>
-            Failed to load today's word
-          </Text>
-          <Text style={[styles.errorText, { color: grayColor }]}>
-            {wordError.message}
-          </Text>
-        </View>
-      )} */}
-
-      {/* Game Content */}
-      {/* {!loadingWord && !wordError && word && ( */}
       <View
         style={[styles.gameContent, { paddingTop: isCompactHeight ? 44 : 56 }]}
       >
@@ -514,41 +533,47 @@ const Page = () => {
               ]}
               key={`row-${rowIndex}`}
             >
-              {row.map((cell, cellIndex) => (
-                <Animated.View
-                  entering={ZoomIn.delay(50 * cellIndex)}
-                  key={`cell-${rowIndex}-${cellIndex}`}
-                >
-                  <Animated.View
-                    style={[
-                      styles.cell,
-                      {
-                        borderColor: palette.border,
-                        backgroundColor: palette.card,
-                        width: tileSize,
-                        height: tileSize,
-                      },
-                      // {
-                      //   borderColor: getBorderColor(cell, rowIndex, cellIndex),
-                      //   backgroundColor: getCellColor(cell, rowIndex, cellIndex),
-                      // },
-                      tileStyles[rowIndex][cellIndex],
-                    ]}
-                  >
-                    <Animated.Text
-                      style={[
-                        styles.cellText,
-                        { fontSize: tileSize * 0.48 },
-                        {
-                          color: curRow > rowIndex ? "#fff" : textColor,
-                        },
-                      ]}
+              {row.map((cell, cellIndex) =>
+                (() => {
+                  const status = feedbackByRow[rowIndex]?.[cellIndex];
+                  const feedbackColor = getFeedbackColor(status);
+                  return (
+                    <Animated.View
+                      entering={ZoomIn.delay(50 * cellIndex)}
+                      key={`cell-${rowIndex}-${cellIndex}`}
                     >
-                      {cell}
-                    </Animated.Text>
-                  </Animated.View>
-                </Animated.View>
-              ))}
+                      <Animated.View
+                        style={[
+                          styles.cell,
+                          {
+                            borderColor: feedbackColor || palette.border,
+                            backgroundColor: feedbackColor || palette.card,
+                            width: tileSize,
+                            height: tileSize,
+                          },
+                          // {
+                          //   borderColor: getBorderColor(cell, rowIndex, cellIndex),
+                          //   backgroundColor: getCellColor(cell, rowIndex, cellIndex),
+                          // },
+                          tileStyles[rowIndex][cellIndex],
+                        ]}
+                      >
+                        <Animated.Text
+                          style={[
+                            styles.cellText,
+                            { fontSize: tileSize * 0.48 },
+                            {
+                              color: curRow > rowIndex ? "#fff" : textColor,
+                            },
+                          ]}
+                        >
+                          {cell}
+                        </Animated.Text>
+                      </Animated.View>
+                    </Animated.View>
+                  );
+                })(),
+              )}
             </Animated.View>
           ))}
         </View>
@@ -608,7 +633,6 @@ const styles = StyleSheet.create({
   },
   gameContent: {
     flex: 1,
-    justifyContent: "space-between",
     paddingHorizontal: 8,
     overflow: "hidden",
   },

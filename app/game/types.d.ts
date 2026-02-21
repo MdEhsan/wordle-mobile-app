@@ -8,7 +8,8 @@ export interface DailyWordResponse {
 }
 
 export interface ValidateWordRequest {
-  word: string;
+  sessionId: string;
+  guess: string;
 }
 
 export interface ValidateWordResponse {
