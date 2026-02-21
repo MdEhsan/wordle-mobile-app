@@ -7,7 +7,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
 import { usePost } from "@/service/hooks/useMutation";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -19,7 +19,6 @@ import {
 } from "react-native";
 import { LOGIN_LABEL } from "../label";
 import { LocalModal } from "../modal";
-import { UsernameModal } from "../username-modal";
 
 export default function LoginPage() {
   const colorScheme = useColorScheme();
@@ -32,22 +31,8 @@ export default function LoginPage() {
   const [verifyOtpFailed, setVerifyOtpFailed] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [mobileNumberFromApi, setMobileNumberFromApi] = useState("");
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [usernameError, setUsernameError] = useState("");
-  const [pendingAuthData, setPendingAuthData] = useState<{
-    token: string;
-    user: any;
-  } | null>(null);
   const auth = useAuth();
   const router = useRouter();
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (auth.isAuthenticated && !auth.isLoading) {
-      router.replace("/play");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth.isAuthenticated, auth.isLoading]);
 
   const { mutate: sendOtp, loading: sendingOtp } = usePost(
     ENDPOINTS.AUTH.SEND_OTP,
@@ -72,29 +57,18 @@ export default function LoginPage() {
     {
       onSuccess: async (data) => {
         setVerifyOtpFailed(false);
-        if (data?.token) {
-          // Check if username exists
-          if (!data.user?.username) {
-            // Show username modal
-            setPendingAuthData({
-              token: data.token,
-              user: data.user || { phone: phoneNumber },
-            });
-            setShowSuccessModal(false);
-            setShowUsernameModal(true);
-          } else {
-            // Username exists, proceed with login
-            try {
-              await auth.login(data.token, data.user || { phone: phoneNumber });
-              router.replace("/play");
-            } catch (_error) {
-              setErrorMessage(
-                LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN,
-              );
-            }
-          }
-        } else {
+        if (!data?.token) {
           setErrorMessage(LOGIN_LABEL.INVALID_RESPONSE);
+          return;
+        }
+
+        try {
+          const userData = data.user || { phone: phoneNumber };
+          await auth.login(data.token, userData);
+          setShowSuccessModal(false);
+          router.replace("/play");
+        } catch (_error) {
+          setErrorMessage(LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN);
         }
       },
       onError: (_error) => {
@@ -115,36 +89,6 @@ export default function LoginPage() {
       onError: (error) => {
         setErrorMessage(
           error.message || LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_RESEND,
-        );
-      },
-    },
-  );
-
-  const { mutate: createUsername, loading: creatingUsername } = usePost(
-    ENDPOINTS.AUTH.CREATE_USERNAME,
-    {
-      onSuccess: async (data) => {
-        // Now save the auth data and navigate
-        if (pendingAuthData) {
-          try {
-            await auth.login(
-              pendingAuthData.token,
-              data.user || pendingAuthData.user,
-            );
-            setShowUsernameModal(false);
-            router.replace("/play");
-          } catch (_error) {
-            console.log("Error saving login after username creation:", _error);
-            setUsernameError(
-              LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN,
-            );
-          }
-        }
-      },
-      onError: (error) => {
-        setUsernameError(
-          error.message ||
-            LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_CREATE_USERNAME,
         );
       },
     },
@@ -193,11 +137,6 @@ export default function LoginPage() {
 
       setVerifyOtpFailed(false);
     }
-  };
-
-  const handleCreateUsername = async (username: string) => {
-    setUsernameError("");
-    await createUsername({ username });
   };
 
   return (
@@ -365,13 +304,6 @@ export default function LoginPage() {
             isResending={resendingOtp}
           />
         )}
-
-        <UsernameModal
-          visible={showUsernameModal}
-          onSubmit={handleCreateUsername}
-          isLoading={creatingUsername}
-          errorMessage={usernameError}
-        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

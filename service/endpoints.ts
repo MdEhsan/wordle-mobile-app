@@ -34,6 +34,12 @@ export const ENDPOINTS = {
     GET_DAILY_WORD: "/game/word",
     VALIDATE_WORD: "/game/validate-word",
   },
+
+  //matchmaking endpoints
+  MATCHMAKING: {
+    FIND_MATCH: "/api/matchmaking/search",
+    ASSIGN_BOT: "/api/matchmaking/assign-bot",
+  },
 } as const;
 
 // Helper function to build endpoint with params

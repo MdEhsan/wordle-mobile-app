@@ -20,7 +20,7 @@ type AuthContextType = {
 };
 
 export const AuthContext = React.createContext<AuthContextType | undefined>(
-  undefined
+  undefined,
 );
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -36,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const loadStoredAuth = async () => {
+    debugger;
     try {
       const [storedToken, storedUser] = await Promise.all([
         AsyncStorage.getItem(TOKEN_KEY),

@@ -1,31 +1,31 @@
+import useAuth from "@/auth-protect/useAuth";
 import OutlinedButton from "@/components/buttons/outlined";
 import { ThemedText } from "@/components/themed-text";
 import { Colors } from "@/constants/Color";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ENDPOINTS } from "@/service/endpoints";
+import { usePut } from "@/service/hooks";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   Keyboard,
   Modal,
   Platform,
+  Pressable,
   StyleSheet,
   TextInput,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { LOGIN_LABEL } from "../label";
-import { UsernameModalProps } from "./types";
 
-export const UsernameModal = ({
-  visible,
-  onSubmit,
-  isLoading = false,
-  errorMessage = "",
-}: UsernameModalProps) => {
+export const UsernameModal = () => {
   const colorScheme = useColorScheme();
   const palette = Colors[colorScheme ?? "light"];
   const [username, setUsername] = useState("");
   const [localError, setLocalError] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+  const auth = useAuth();
+  const errorMessage = usernameError;
 
   const handleSubmit = () => {
     const trimmedUsername = username.trim();
@@ -54,17 +54,51 @@ export const UsernameModal = ({
     }
 
     setLocalError("");
-    onSubmit(trimmedUsername);
+    handleCreateUsername(trimmedUsername);
+  };
+
+  const { mutate: createUsername, loading: creatingUsername } = usePut(
+    ENDPOINTS.USER.UPDATE_PROFILE,
+    {
+      onSuccess: async (data) => {
+        try {
+          const updatedUser = data?.user;
+          if (auth.token) {
+            await auth.login(auth.token, updatedUser);
+          }
+        } catch (_error) {
+          setUsernameError(LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_SAVE_LOGIN);
+        }
+      },
+      onError: (error) => {
+        setUsernameError(
+          error.message ||
+            LOGIN_LABEL.API_ERROR_MESSAGE.FAILED_TO_CREATE_USERNAME,
+        );
+      },
+    },
+  );
+
+  const handleCreateUsername = async (username: string) => {
+    setUsernameError("");
+    await createUsername({ username });
   };
 
   return (
     <Modal
       transparent={true}
-      visible={visible}
+      visible={true}
       animationType="fade"
       onRequestClose={() => {}}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <Pressable
+        onPress={() => {
+          if (Platform.OS !== "web") {
+            Keyboard.dismiss();
+          }
+        }}
+        style={{ flex: 1 }}
+      >
         <View
           style={[
             styles.modalOverlay,
@@ -115,7 +149,7 @@ export const UsernameModal = ({
                 maxLength={20}
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!isLoading}
+                editable={!creatingUsername}
               />
 
               {(localError || errorMessage) && (
@@ -128,13 +162,13 @@ export const UsernameModal = ({
                 <OutlinedButton
                   title="Create Username"
                   onPress={handleSubmit}
-                  isLoading={isLoading}
+                  isLoading={creatingUsername}
                 />
               </View>
             </View>
           </View>
         </View>
-      </TouchableWithoutFeedback>
+      </Pressable>
     </Modal>
   );
 };
