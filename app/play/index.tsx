@@ -108,14 +108,7 @@ export default function PlayPage() {
     ENDPOINTS.MATCHMAKING.FIND_MATCH,
     {
       onSuccess: async (data) => {
-        const sessionId = data?.data?.sessionId ?? "";
-        if (sessionId) {
-          router.push(`/game?sessionId=${sessionId}`);
-          return;
-        }
         const resolvedSessionId = data?.data?.sessionId || null;
-        setSessionId(resolvedSessionId);
-
         try {
           socketService.connect({
             token: auth.token ?? "",
@@ -130,16 +123,20 @@ export default function PlayPage() {
           });
         }
 
-        const opponentType = data?.data?.opponentType;
-        if (
-          opponentType === "bot" &&
-          resolvedSessionId &&
-          mode.toLowerCase() === "multiplayer"
-        ) {
-          await assignBot({ sessionId: resolvedSessionId });
+        // const opponentType = data?.data?.opponentType;
+        // if (
+        //   opponentType === "bot" &&
+        //   resolvedSessionId &&
+        //   mode.toLowerCase() === "multiplayer"
+        // ) {
+        //   await assignBot({ sessionId: resolvedSessionId });
+        //   return;
+        // }
+
+        if (resolvedSessionId) {
+          router.push(`/game?sessionId=${resolvedSessionId}`);
           return;
         }
-
         Toast.show({
           type: "success",
           text1: PLAY_LABELS.MATCHMAKING.MATCHMAKING_STARTED,
@@ -244,11 +241,6 @@ export default function PlayPage() {
       socketService.disconnect();
     };
   }, [router]);
-
-  const handleLogout = async () => {
-    await auth.signOut();
-    router.replace("/auth/login");
-  };
 
   const handleStartGame = async () => {
     if (isStarting || isFindingMatch || isAssigningBot) {
