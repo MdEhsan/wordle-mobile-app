@@ -1,7 +1,6 @@
 import useAuth from "@/auth-protect/useAuth";
 import Profile from "@/components/profile";
 import { Colors } from "@/constants/Color";
-import { useAppTheme } from "@/hooks/app-theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
 import { useFetch, usePost } from "@/service/hooks";
@@ -30,13 +29,15 @@ export default function PlayPage() {
   const backgroundColor = palette.gameBg;
   const textColor = palette.text;
   const auth = useAuth();
-  const { theme, toggleTheme } = useAppTheme();
   const [mode, setMode] = useState<UIMode>("SINGLE");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [socketStatus, setSocketStatus] =
     useState<SocketConnectionState>("idle");
+  const [isMatchmakingFlowActive, setIsMatchmakingFlowActive] = useState(false);
+  const [isMatchSearchTimedOut, setIsMatchSearchTimedOut] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
+  const matchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   let mockData = {
     totalGames: 120,
@@ -109,20 +110,7 @@ export default function PlayPage() {
     {
       onSuccess: async (data) => {
         const resolvedSessionId = data?.data?.sessionId || null;
-        try {
-          socketService.connect({
-            token: auth.token ?? "",
-          });
-        } catch (socketError: any) {
-          Toast.show({
-            type: "error",
-            text1: "Socket connection failed",
-            text2: socketError?.message || PLAY_LABELS.TRY_AGAIN,
-            position: "bottom",
-            bottomOffset: 100,
-          });
-        }
-
+        setSessionId(resolvedSessionId);
         // const opponentType = data?.data?.opponentType;
         // if (
         //   opponentType === "bot" &&
@@ -133,10 +121,10 @@ export default function PlayPage() {
         //   return;
         // }
 
-        if (resolvedSessionId) {
-          router.push(`/game?sessionId=${resolvedSessionId}`);
-          return;
-        }
+        // if (resolvedSessionId) {
+        //   router.push(`/game?sessionId=${resolvedSessionId}`);
+        //   return;
+        // }
         Toast.show({
           type: "success",
           text1: PLAY_LABELS.MATCHMAKING.MATCHMAKING_STARTED,
@@ -146,6 +134,13 @@ export default function PlayPage() {
         });
       },
       onError: (error) => {
+        if (matchTimeoutRef.current) {
+          clearTimeout(matchTimeoutRef.current);
+          matchTimeoutRef.current = null;
+        }
+        setIsMatchmakingFlowActive(false);
+        setIsMatchSearchTimedOut(false);
+
         Toast.show({
           type: "error",
           text1: PLAY_LABELS.MATCHMAKING.ERROR,
@@ -204,23 +199,23 @@ export default function PlayPage() {
 
   useEffect(() => {
     const unsubscribe = socketService.subscribe((payload) => {
+      console.log("Received matchmaking event:", payload);
       const message = (payload || {}) as any;
       const eventType = String(
         message?.event || message?.type || message?.data?.event || "",
-      ).toLowerCase();
+      ).toUpperCase();
       const gameId =
         message?.data?.gameId || message?.gameId || message?.data?.matchId;
       const incomingSessionId =
         message?.data?.sessionId || message?.sessionId || null;
 
-      const isMatchReadyEvent =
-        eventType.includes("match") ||
-        eventType.includes("ready") ||
-        eventType.includes("start") ||
-        message?.data?.matchFound === true ||
-        message?.matchFound === true;
+      const allowedEvents = new Set([
+        "MATCH_FOUND",
+        "GAME_STARTED",
+        "SESSION_STARTED",
+      ]);
 
-      if (!isMatchReadyEvent || !gameId) {
+      if (!allowedEvents.has(eventType)) {
         return;
       }
 
@@ -233,17 +228,45 @@ export default function PlayPage() {
         return;
       }
 
-      router.push(`/game?gameId=${gameId}`);
+      if (matchTimeoutRef.current) {
+        clearTimeout(matchTimeoutRef.current);
+        matchTimeoutRef.current = null;
+      }
+      setIsMatchmakingFlowActive(false);
+      setIsMatchSearchTimedOut(false);
+
+      const resolvedSessionId = incomingSessionId || currentSessionId;
+      if (resolvedSessionId) {
+        router.push(`/game?sessionId=${resolvedSessionId}`);
+        return;
+      }
+
+      if (gameId) {
+        router.push(`/game?gameId=${gameId}`);
+      }
     });
 
     return () => {
       unsubscribe();
       socketService.disconnect();
     };
-  }, [router]);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (matchTimeoutRef.current) {
+        clearTimeout(matchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleStartGame = async () => {
-    if (isStarting || isFindingMatch || isAssigningBot) {
+    if (
+      isStarting ||
+      isFindingMatch ||
+      isAssigningBot ||
+      isMatchmakingFlowActive
+    ) {
       return;
     }
 
@@ -256,24 +279,58 @@ export default function PlayPage() {
         "",
     );
 
-    await findMatch({
-      userId: resolvedUserId,
-      eloRating: Number(stats?.eloRating ?? 0),
-      mode: mode.toLowerCase() === "single" ? "single_player" : "multiplayer",
-      gameType: "wordle",
-    });
+    if (mode.toLowerCase() === "multiplayer") {
+      setIsMatchmakingFlowActive(true);
+      setIsMatchSearchTimedOut(false);
 
-    // await startGame({ mode });
+      if (matchTimeoutRef.current) {
+        clearTimeout(matchTimeoutRef.current);
+      }
+      matchTimeoutRef.current = setTimeout(() => {
+        setIsMatchSearchTimedOut(true);
+      }, 30000);
+
+      try {
+        socketService.connect({
+          token: auth.token ?? "",
+        });
+      } catch (socketError: any) {
+        if (matchTimeoutRef.current) {
+          clearTimeout(matchTimeoutRef.current);
+          matchTimeoutRef.current = null;
+        }
+        setIsMatchmakingFlowActive(false);
+
+        Toast.show({
+          type: "error",
+          text1: "Socket connection failed",
+          text2: socketError?.message || PLAY_LABELS.TRY_AGAIN,
+          position: "bottom",
+          bottomOffset: 100,
+        });
+      }
+
+      await findMatch({
+        userId: resolvedUserId,
+        eloRating: Number(stats?.eloRating ?? 0),
+        mode: mode.toLowerCase() === "single" ? "single_player" : "multiplayer",
+        gameType: "wordle",
+      });
+      return;
+    }
+
+    await startGame({ mode });
   };
 
   const showWaitingForMatch =
-    !!sessionId &&
+    isMatchmakingFlowActive &&
     mode.toLowerCase() === "multiplayer" &&
     (isFindingMatch ||
       isAssigningBot ||
       socketStatus === "connecting" ||
       socketStatus === "connected" ||
-      socketStatus === "reconnecting");
+      socketStatus === "reconnecting" ||
+      isMatchSearchTimedOut);
 
   const socketStatusLabelMap: Record<SocketConnectionState, string> = {
     idle: "Idle",
@@ -407,13 +464,24 @@ export default function PlayPage() {
           style={[
             styles.playButton,
             { backgroundColor: palette.green },
-            (isStarting || isFindingMatch || isAssigningBot) &&
+            (isStarting ||
+              isFindingMatch ||
+              isAssigningBot ||
+              isMatchmakingFlowActive) &&
               styles.playButtonDisabled,
           ]}
           onPress={handleStartGame}
-          disabled={isStarting || isFindingMatch || isAssigningBot}
+          disabled={
+            isStarting ||
+            isFindingMatch ||
+            isAssigningBot ||
+            isMatchmakingFlowActive
+          }
         >
-          {isStarting || isFindingMatch || isAssigningBot ? (
+          {isStarting ||
+          isFindingMatch ||
+          isAssigningBot ||
+          isMatchmakingFlowActive ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Ionicons name="play" size={32} color="#fff" />
@@ -425,19 +493,34 @@ export default function PlayPage() {
                 ? PLAY_LABELS.ASSIGN_BOT.ASSIGNING_BOT
                 : isFindingMatch
                   ? PLAY_LABELS.MATCHMAKING.FINDING_MATCH
-                  : PLAY_LABELS.PLAY_GAME}
+                  : isMatchmakingFlowActive
+                    ? PLAY_LABELS.MATCHMAKING.FINDING_MATCH
+                    : PLAY_LABELS.PLAY_GAME}
           </Text>
         </TouchableOpacity>
 
         {showWaitingForMatch ? (
-          <View style={styles.waitingContainer}>
-            <ActivityIndicator color={palette.green} size="small" />
-            <Text style={[styles.waitingTitle, { color: textColor }]}>
-              Waiting for opponent...
-            </Text>
-            <Text style={[styles.waitingSubText, { color: textColor }]}>
-              Socket: {socketStatusLabelMap[socketStatus]}
-            </Text>
+          <View style={styles.waitingOverlay}>
+            <View
+              style={[
+                styles.waitingContainer,
+                { backgroundColor: palette.card, borderColor: palette.border },
+              ]}
+            >
+              <ActivityIndicator color={palette.green} size="large" />
+              <Text style={[styles.waitingTitle, { color: textColor }]}>
+                Please wait, match is getting started...
+              </Text>
+              {isMatchSearchTimedOut ? (
+                <Text style={[styles.waitingSubText, { color: textColor }]}>
+                  Still searching for players...
+                </Text>
+              ) : (
+                <Text style={[styles.waitingSubText, { color: textColor }]}>
+                  Socket: {socketStatusLabelMap[socketStatus]}
+                </Text>
+              )}
+            </View>
           </View>
         ) : null}
 
@@ -459,6 +542,13 @@ export default function PlayPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  waitingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 60,
+    paddingHorizontal: 24,
   },
   menuBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -532,9 +622,14 @@ const styles = StyleSheet.create({
     fontFamily: "FrankRuhlLibre_700Bold",
   },
   waitingContainer: {
-    marginTop: 16,
+    width: "100%",
+    maxWidth: 360,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     alignItems: "center",
-    gap: 4,
+    gap: 8,
   },
   waitingTitle: {
     fontSize: 15,
