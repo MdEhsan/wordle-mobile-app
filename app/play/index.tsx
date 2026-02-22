@@ -199,13 +199,8 @@ export default function PlayPage() {
 
   useEffect(() => {
     const unsubscribe = socketService.subscribe((payload) => {
-      console.log("Received matchmaking event:", payload);
       const message = (payload || {}) as any;
-      const eventType = String(
-        message?.event || message?.type || message?.data?.event || "",
-      ).toUpperCase();
-      const gameId =
-        message?.data?.gameId || message?.gameId || message?.data?.matchId;
+      const eventType = String(message?.event).toUpperCase();
       const incomingSessionId =
         message?.data?.sessionId || message?.sessionId || null;
 
@@ -213,6 +208,7 @@ export default function PlayPage() {
         "MATCH_FOUND",
         "GAME_STARTED",
         "SESSION_STARTED",
+        "SESSION_RECOVERY_AVAILABLE",
       ]);
 
       if (!allowedEvents.has(eventType)) {
@@ -237,12 +233,8 @@ export default function PlayPage() {
 
       const resolvedSessionId = incomingSessionId || currentSessionId;
       if (resolvedSessionId) {
-        router.push(`/game?sessionId=${resolvedSessionId}`);
+        router.push(`/game?sessionId=${incomingSessionId}`);
         return;
-      }
-
-      if (gameId) {
-        router.push(`/game?gameId=${gameId}`);
       }
     });
 
@@ -374,6 +366,7 @@ export default function PlayPage() {
           <Profile
             profileName={profileName}
             setShowProfileMenu={setShowProfileMenu}
+            isLogoutVisible={true}
           />
         ) : null}
       </View>

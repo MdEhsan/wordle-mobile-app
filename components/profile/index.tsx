@@ -9,9 +9,11 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 const Profile = ({
   profileName,
   setShowProfileMenu,
+  isLogoutVisible = false,
 }: {
   profileName: string;
   setShowProfileMenu: (show: boolean) => void;
+  isLogoutVisible?: boolean;
 }) => {
   const { theme, toggleTheme } = useAppTheme();
   const colorScheme = useColorScheme();
@@ -64,16 +66,20 @@ const Profile = ({
         </Text>
       </Pressable>
 
-      <Pressable
-        style={styles.menuItem}
-        onPress={async () => {
-          setShowProfileMenu(false);
-          await handleLogout();
-        }}
-      >
-        <Ionicons name="log-out-outline" size={18} color={textColor} />
-        <Text style={[styles.menuItemText, { color: textColor }]}>Logout</Text>
-      </Pressable>
+      {isLogoutVisible && (
+        <Pressable
+          style={styles.menuItem}
+          onPress={async () => {
+            setShowProfileMenu(false);
+            await handleLogout();
+          }}
+        >
+          <Ionicons name="log-out-outline" size={18} color={textColor} />
+          <Text style={[styles.menuItemText, { color: textColor }]}>
+            Logout
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 };

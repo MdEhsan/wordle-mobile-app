@@ -8,10 +8,12 @@ import { Colors } from "@/constants/Color";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { ENDPOINTS } from "@/service/endpoints";
 import { useMutation } from "@/service/hooks/useMutation";
+import socketService from "@/service/socket.service";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  BackHandler,
   Modal,
   Platform,
   Pressable,
@@ -53,6 +55,8 @@ const Page = () => {
   const [grayLetters, setGrayLetters] = useState<string[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+  const [isAbandoningGame, setIsAbandoningGame] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [word, setWord] = useState<string>("");
   const [feedbackByRow, setFeedbackByRow] = useState<string[][]>(
@@ -60,6 +64,7 @@ const Page = () => {
   );
 
   const colStateRef = useRef(curCol);
+  const isAbandoningGameRef = useRef(false);
 
   const router = useRouter();
   const { sessionId } = useLocalSearchParams();
@@ -77,6 +82,45 @@ const Page = () => {
       router.replace("/auth/login");
     }
   }, [auth.isAuthenticated, auth.isLoading]);
+
+  const handleGameExit = () => {
+    setShowExitConfirmation(true);
+  };
+
+  const handleConfirmExit = async () => {
+    if (isAbandoningGameRef.current) {
+      return;
+    }
+
+    isAbandoningGameRef.current = true;
+    setIsAbandoningGame(true);
+    setShowExitConfirmation(false);
+
+    socketService.disconnect();
+    router.push("/play");
+  };
+
+  const handleCancelExit = () => {
+    setShowExitConfirmation(false);
+  };
+
+  // Register BackHandler for Android hardware back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        if (!isAbandoningGameRef.current) {
+          handleGameExit();
+          return true; // Prevent default back behavior
+        }
+        return false; // Allow default back behavior
+      },
+    );
+
+    return () => {
+      backHandler.remove();
+    };
+  }, []);
 
   const isCompactHeight = height < 760;
   const tileGap = width < 360 ? 6 : 8;
@@ -414,8 +458,9 @@ const Page = () => {
 
       <TouchableOpacity
         style={styles.backButton}
-        onPress={() => router.push("/play")}
+        onPress={handleGameExit}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        disabled={isAbandoningGame}
       >
         <Ionicons name="arrow-back" size={28} color={textColor} />
       </TouchableOpacity>
@@ -552,6 +597,56 @@ const Page = () => {
           </Animated.View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showExitConfirmation}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelExit}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[
+              styles.exitConfirmContent,
+              { backgroundColor: palette.card },
+            ]}
+            entering={ZoomIn.duration(300)}
+          >
+            <Text style={[styles.exitConfirmTitle, { color: textColor }]}>
+              Leave Game?
+            </Text>
+            <Text style={[styles.exitConfirmMessage, { color: textColor }]}>
+              Are you sure you want to leave? Your current game will be ended.
+            </Text>
+            <View style={styles.exitButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.exitButton,
+                  styles.cancelButton,
+                  { borderColor: palette.gray },
+                ]}
+                onPress={handleCancelExit}
+                disabled={isAbandoningGame}
+              >
+                <Text style={[styles.exitButtonText, { color: textColor }]}>
+                  No
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.exitButton,
+                  styles.confirmButton,
+                  { backgroundColor: palette.green },
+                ]}
+                onPress={handleConfirmExit}
+                disabled={isAbandoningGame}
+              >
+                <Text style={styles.confirmButtonText}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -678,5 +773,55 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
+  },
+  exitConfirmContent: {
+    width: "85%",
+    padding: 28,
+    borderRadius: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  exitConfirmTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  exitConfirmMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  exitButtonContainer: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  exitButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelButton: {
+    borderWidth: 2,
+  },
+  confirmButton: {},
+  exitButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  confirmButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
