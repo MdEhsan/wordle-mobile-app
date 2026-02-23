@@ -50,7 +50,9 @@ export default function PlayPage() {
   };
 
   const { data: statsData, loading: statsLoading } =
-    useFetch<GameStatsResponse>(ENDPOINTS.GAME.GET_STATS);
+    useFetch<GameStatsResponse>(
+      `${ENDPOINTS.GAME.GET_STATS}?userId=${auth.user?.id || ""}`,
+    );
 
   const profileName =
     statsData?.data?.username || auth.user?.username || "Player";
@@ -208,7 +210,6 @@ export default function PlayPage() {
         "MATCH_FOUND",
         "GAME_STARTED",
         "SESSION_STARTED",
-        "SESSION_RECOVERY_AVAILABLE",
       ]);
 
       if (!allowedEvents.has(eventType)) {
