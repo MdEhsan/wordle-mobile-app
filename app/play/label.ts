@@ -29,6 +29,7 @@ export const PLAY_LABELS = {
     SEARCHING_OPPONENT: "Searching for an opponent...",
     ERROR: "Failed to find match",
     FINDING_MATCH: "Finding match...",
+    GAME_READY: "Getting your game ready…",
   },
   TRY_AGAIN: "Please try again.",
   ASSIGN_BOT: {

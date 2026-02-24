@@ -1,4 +1,5 @@
 import useAuth from "@/auth-protect/useAuth";
+import WordleLoader from "@/components/loader";
 import Profile from "@/components/profile";
 import { Colors } from "@/constants/Color";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -493,7 +494,12 @@ export default function PlayPage() {
           </Text>
         </TouchableOpacity>
 
-        {showWaitingForMatch ? (
+        <WordleLoader
+          visible={showWaitingForMatch}
+          message={PLAY_LABELS.MATCHMAKING.GAME_READY}
+        />
+
+        {/* {showWaitingForMatch ? (
           <View style={styles.waitingOverlay}>
             <View
               style={[
@@ -516,7 +522,7 @@ export default function PlayPage() {
               )}
             </View>
           </View>
-        ) : null}
+        ) : null} */}
 
         <View style={styles.infoContainer}>
           <Text style={[styles.infoText, { color: textColor }]}>
