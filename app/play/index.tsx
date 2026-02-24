@@ -273,7 +273,10 @@ export default function PlayPage() {
         "",
     );
 
-    if (mode.toLowerCase() === "multiplayer") {
+    if (
+      mode.toLowerCase() === "multiplayer" ||
+      mode.toLowerCase() === "single"
+    ) {
       setIsMatchmakingFlowActive(true);
       setIsMatchSearchTimedOut(false);
 
@@ -313,7 +316,7 @@ export default function PlayPage() {
       return;
     }
 
-    await startGame({ mode });
+    // await startGame({ mode });
   };
 
   const showWaitingForMatch =
@@ -325,15 +328,6 @@ export default function PlayPage() {
       socketStatus === "connected" ||
       socketStatus === "reconnecting" ||
       isMatchSearchTimedOut);
-
-  const socketStatusLabelMap: Record<SocketConnectionState, string> = {
-    idle: "Idle",
-    connecting: "Connecting",
-    connected: "Connected",
-    reconnecting: "Reconnecting",
-    disconnected: "Disconnected",
-    error: "Connection error",
-  };
 
   return (
     <View style={[styles.container, { backgroundColor }]}>
