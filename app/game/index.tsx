@@ -1,4 +1,6 @@
 import useAuth from "@/auth-protect/useAuth";
+import { CustomModal } from "@/components/modal";
+import { ModalLabel } from "@/components/modal/label";
 import OnScreenKeyboard, {
   BACKSPACE,
   ENTER,
@@ -14,11 +16,9 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   BackHandler,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -54,6 +54,7 @@ const Page = () => {
   const [yellowLetters, setYellowLetters] = useState<string[]>([]);
   const [grayLetters, setGrayLetters] = useState<string[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showOpponentWinModal, setShowOpponentWinModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [isAbandoningGame, setIsAbandoningGame] = useState(false);
@@ -65,6 +66,15 @@ const Page = () => {
 
   const colStateRef = useRef(curCol);
   const isAbandoningGameRef = useRef(false);
+  const hasNavigatedRef = useRef(false);
+  const hasHandledOpponentWinRef = useRef(false);
+  const winRedirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const opponentRedirectTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const socketUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const router = useRouter();
   const { sessionId } = useLocalSearchParams();
@@ -83,6 +93,33 @@ const Page = () => {
     }
   }, [auth.isAuthenticated, auth.isLoading]);
 
+  const clearNavigationTimers = () => {
+    if (winRedirectTimeoutRef.current) {
+      clearTimeout(winRedirectTimeoutRef.current);
+      winRedirectTimeoutRef.current = null;
+    }
+
+    if (opponentRedirectTimeoutRef.current) {
+      clearTimeout(opponentRedirectTimeoutRef.current);
+      opponentRedirectTimeoutRef.current = null;
+    }
+  };
+
+  const navigateToPlayOnce = (options?: { disconnectSocket?: boolean }) => {
+    if (hasNavigatedRef.current) {
+      return;
+    }
+
+    clearNavigationTimers();
+    hasNavigatedRef.current = true;
+
+    if (options?.disconnectSocket) {
+      socketService.disconnect();
+    }
+
+    router.push("/play");
+  };
+
   const handleGameExit = () => {
     setShowExitConfirmation(true);
   };
@@ -96,12 +133,46 @@ const Page = () => {
     setIsAbandoningGame(true);
     setShowExitConfirmation(false);
 
-    socketService.disconnect();
-    router.push("/play");
+    navigateToPlayOnce({ disconnectSocket: true });
   };
 
-  const handleCancelExit = () => {
-    setShowExitConfirmation(false);
+  const handleSuccessContinue = () => {
+    setShowSuccessModal(false);
+    navigateToPlayOnce();
+  };
+
+  const scheduleWinRedirect = () => {
+    if (winRedirectTimeoutRef.current) {
+      clearTimeout(winRedirectTimeoutRef.current);
+    }
+
+    winRedirectTimeoutRef.current = setTimeout(() => {
+      setShowSuccessModal(false);
+      navigateToPlayOnce();
+    }, 2500);
+  };
+
+  const handleOpponentWin = () => {
+    if (hasNavigatedRef.current || hasHandledOpponentWinRef.current) {
+      return;
+    }
+
+    hasHandledOpponentWinRef.current = true;
+
+    setShowOpponentWinModal(true);
+
+    if (opponentRedirectTimeoutRef.current) {
+      clearTimeout(opponentRedirectTimeoutRef.current);
+    }
+
+    opponentRedirectTimeoutRef.current = setTimeout(() => {
+      setShowOpponentWinModal(false);
+      if (socketUnsubscribeRef.current) {
+        socketUnsubscribeRef.current();
+        socketUnsubscribeRef.current = null;
+      }
+      navigateToPlayOnce({ disconnectSocket: true });
+    }, 2500);
   };
 
   // Register BackHandler for Android hardware back button
@@ -119,6 +190,87 @@ const Page = () => {
 
     return () => {
       backHandler.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    hasHandledOpponentWinRef.current = false;
+
+    const unsubscribe = socketService.subscribe((payload) => {
+      console.log("Received socket message:", payload);
+      const message = (payload || {}) as {
+        event?: string;
+        type?: string;
+        winnerUsername?: string;
+        data?: { sessionId?: string; winnerUsername?: string };
+        payload?: { winnerUsername?: string; sessionId?: string };
+        sessionId?: string;
+      };
+
+      const eventType = String(
+        message?.event || message?.type || "",
+      ).toUpperCase();
+      const winnerUsername =
+        typeof message?.winnerUsername === "string"
+          ? message.winnerUsername
+          : typeof message?.data?.winnerUsername === "string"
+            ? message.data.winnerUsername
+            : typeof message?.payload?.winnerUsername === "string"
+              ? message.payload.winnerUsername
+              : undefined;
+      const currentUsername = auth?.user?.username;
+
+      if (!winnerUsername || !currentUsername) {
+        return;
+      }
+
+      if (
+        eventType &&
+        eventType !== "PLAYER_COMPLETED" &&
+        eventType !== "GAME_OVER" &&
+        eventType !== "MATCH_RESULT"
+      ) {
+        return;
+      }
+
+      const normalizedWinner = String(winnerUsername).trim().toLowerCase();
+      const normalizedCurrent = String(currentUsername).trim().toLowerCase();
+      const isOpponentWin = normalizedWinner !== normalizedCurrent;
+      if (!isOpponentWin) {
+        return;
+      }
+
+      const incomingSessionId =
+        message?.data?.sessionId ||
+        message?.sessionId ||
+        message?.payload?.sessionId ||
+        null;
+      const resolvedSessionId = Array.isArray(sessionId)
+        ? sessionId[0]
+        : sessionId;
+
+      if (
+        incomingSessionId &&
+        resolvedSessionId &&
+        String(incomingSessionId) !== String(resolvedSessionId)
+      ) {
+        return;
+      }
+
+      handleOpponentWin();
+    });
+
+    socketUnsubscribeRef.current = unsubscribe;
+
+    return () => {
+      unsubscribe();
+      socketUnsubscribeRef.current = null;
+    };
+  }, [sessionId, auth?.user?.username]);
+
+  useEffect(() => {
+    return () => {
+      clearNavigationTimers();
     };
   }, []);
 
@@ -266,19 +418,17 @@ const Page = () => {
     setYellowLetters([...yellowLetters, ...newYellow]);
     setGrayLetters([...grayLetters, ...newGray]);
 
-    const isCorrectGuess =
-      validationResult?.data?.isCorrect === true ||
-      validationResult?.isCorrect === true ||
-      validationResult?.correct === true ||
-      validationResult?.data?.status === "won" ||
-      validationResult?.status === "won";
+    const isAllCorrectFeedback =
+      normalizedFeedback.length === 5 &&
+      normalizedFeedback.every((status) => status === "correct");
 
-    const targetWordFromApi =
-      validationResult?.data?.word ||
-      validationResult?.data?.targetWord ||
-      validationResult?.word ||
-      validationResult?.targetWord ||
-      "";
+    const isCorrectGuess =
+      isAllCorrectFeedback ||
+      validationResult?.data?.isWin === true ||
+      validationResult?.data?.isGameOver === true ||
+      validationResult?.data?.status === "won";
+
+    const targetWordFromApi = validationResult?.data?.guess;
 
     const isGameOver =
       validationResult?.data?.gameOver === true ||
@@ -303,11 +453,11 @@ const Page = () => {
           setWord(String(targetWordFromApi));
         }
         setShowSuccessModal(true);
+        scheduleWinRedirect();
       } else if (isGameOver || curRow + 1 >= rows.length) {
         if (targetWordFromApi) {
           setWord(String(targetWordFromApi));
         }
-        console.log("GAME OVER");
       }
     }, 1500);
     setCurRow((prev) => prev + 1);
@@ -353,7 +503,7 @@ const Page = () => {
         withTiming(color),
       );
     } else {
-      cellBackgrounds[rowIndex][cellIndex].value = withTiming("transparent", {
+      cellBackgrounds[rowIndex][cellIndex].value = withTiming(palette.card, {
         duration: 100,
       });
     }
@@ -396,7 +546,7 @@ const Page = () => {
   );
 
   const cellBackgrounds = Array.from({ length: ROWS }, () =>
-    Array.from({ length: 5 }, () => useSharedValue("transparent")),
+    Array.from({ length: 5 }, () => useSharedValue(palette.card)),
   );
 
   const cellBorders = Array.from({ length: ROWS }, () =>
@@ -408,6 +558,7 @@ const Page = () => {
       useAnimatedStyle(() => {
         return {
           transform: [{ rotateX: `${tileRotates[index][tileIndex].value}deg` }],
+          backgroundColor: cellBackgrounds[index][tileIndex].value,
         };
       }),
     );
@@ -525,14 +676,9 @@ const Page = () => {
                           styles.cell,
                           {
                             borderColor: feedbackColor || palette.border,
-                            backgroundColor: feedbackColor || palette.card,
                             width: tileSize,
                             height: tileSize,
                           },
-                          // {
-                          //   borderColor: getBorderColor(cell, rowIndex, cellIndex),
-                          //   backgroundColor: getCellColor(cell, rowIndex, cellIndex),
-                          // },
                           tileStyles[rowIndex][cellIndex],
                         ]}
                       >
@@ -564,89 +710,41 @@ const Page = () => {
       </View>
       {/* )} */}
 
-      <Modal
-        visible={showSuccessModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSuccessModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Animated.View
-            style={[styles.modalContent, { backgroundColor: palette.card }]}
-            entering={ZoomIn.duration(300)}
-          >
-            <Text style={styles.successEmoji}>🎉</Text>
-            <Text style={[styles.successTitle, { color: textColor }]}>
-              Congratulations!
-            </Text>
-            <Text style={[styles.successMessage, { color: textColor }]}>
-              {successMessage}
-            </Text>
-            <Text style={[styles.wordReveal, { color: palette.green }]}>
-              {`The word was: ${word.toUpperCase()}`}
-            </Text>
-            <TouchableOpacity
-              style={[styles.closeButton, { backgroundColor: palette.green }]}
-              onPress={() => {
-                setShowSuccessModal(false);
-                router.push("/play");
-              }}
-            >
-              <Text style={styles.closeButtonText}>Awesome!</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </Modal>
+      <CustomModal
+        modalType="success"
+        showModal={showSuccessModal}
+        setShowModal={setShowSuccessModal}
+        successMessage={successMessage}
+        word={word}
+        handleSuccessContinue={handleSuccessContinue}
+        texts={{
+          congratulations: ModalLabel.successModal.congratulations,
+          awesome: ModalLabel.successModal.awesome,
+        }}
+      />
 
-      <Modal
-        visible={showExitConfirmation}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleCancelExit}
-      >
-        <View style={styles.modalOverlay}>
-          <Animated.View
-            style={[
-              styles.exitConfirmContent,
-              { backgroundColor: palette.card },
-            ]}
-            entering={ZoomIn.duration(300)}
-          >
-            <Text style={[styles.exitConfirmTitle, { color: textColor }]}>
-              Leave Game?
-            </Text>
-            <Text style={[styles.exitConfirmMessage, { color: textColor }]}>
-              Are you sure you want to leave? Your current game will be ended.
-            </Text>
-            <View style={styles.exitButtonContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.exitButton,
-                  styles.cancelButton,
-                  { borderColor: palette.gray },
-                ]}
-                onPress={handleCancelExit}
-                disabled={isAbandoningGame}
-              >
-                <Text style={[styles.exitButtonText, { color: textColor }]}>
-                  No
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.exitButton,
-                  styles.confirmButton,
-                  { backgroundColor: palette.green },
-                ]}
-                onPress={handleConfirmExit}
-                disabled={isAbandoningGame}
-              >
-                <Text style={styles.confirmButtonText}>Yes</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+      <CustomModal
+        modalType="opponentWin"
+        showModal={showOpponentWinModal}
+        setShowModal={setShowOpponentWinModal}
+        texts={{
+          gameOver: ModalLabel.opponentWinModal.gameOver,
+          opponentWin: "Opponent has won.",
+        }}
+      />
+
+      <CustomModal
+        modalType="exitConfirmation"
+        showModal={showExitConfirmation}
+        setShowModal={setShowExitConfirmation}
+        handleConfirmExit={handleConfirmExit}
+        texts={{
+          leaveGame: ModalLabel.exitConfirmationModal.leaveGame,
+          leaveConfirmation: ModalLabel.exitConfirmationModal.leaveConfirmation,
+          cancel: ModalLabel.exitConfirmationModal.cancel,
+          confirm: ModalLabel.exitConfirmationModal.confirm,
+        }}
+      />
     </View>
   );
 };
@@ -720,108 +818,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     paddingHorizontal: 20,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: Colors.dark.modalOverlay,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "85%",
-    padding: 32,
-    borderRadius: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  successEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  successTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
-  successMessage: {
-    fontSize: 18,
-    textAlign: "center",
-    marginBottom: 16,
-    fontWeight: "600",
-  },
-  wordReveal: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 24,
-    letterSpacing: 2,
-  },
-  closeButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 25,
-    minWidth: 150,
-    alignItems: "center",
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  exitConfirmContent: {
-    width: "85%",
-    padding: 28,
-    borderRadius: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  exitConfirmTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  exitConfirmMessage: {
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  exitButtonContainer: {
-    flexDirection: "row",
-    gap: 12,
-    width: "100%",
-  },
-  exitButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelButton: {
-    borderWidth: 2,
-  },
-  confirmButton: {},
-  exitButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  confirmButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
   },
 });

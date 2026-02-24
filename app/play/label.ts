@@ -1,5 +1,5 @@
 export const PLAY_LABELS = {
-  TTTLE: "Worlde",
+  TTTLE: "Wordle",
   GAME_INTRO: " Ready to test your word skills?",
   CHOOSE_MODE: "Choose mode",
   MODE: {
