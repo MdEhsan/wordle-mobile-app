@@ -1,23 +1,25 @@
-import useAuth from "@/auth-protect/useAuth";
+import WordleLoader from "@/components/loader";
 import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
-import LandingPage from "./page/landing-page";
+import React, { useEffect, useRef } from "react";
 
 export default function Index() {
-  const auth = useAuth();
   const router = useRouter();
+  const hasNavigatedRef = useRef(false);
 
   useEffect(() => {
-    if (!auth.isAuthenticated) {
+    const timer = setTimeout(() => {
+      if (hasNavigatedRef.current) {
+        return;
+      }
+
+      hasNavigatedRef.current = true;
       router.replace("/auth/login");
-    } else {
-      // If authenticated, send to play by default
-      router.replace("/play");
-    }
-  }, [auth.isAuthenticated]);
+    }, 3000);
 
-  // don't render the landing page while redirecting
-  if (!auth.isAuthenticated) return null;
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [router]);
 
-  return <LandingPage />;
+  return <WordleLoader visible={true} splash={true} hideMessage={true} />;
 }

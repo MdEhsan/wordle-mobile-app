@@ -1,4 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import { Colors } from "@/constants/Color";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Modal,
@@ -18,8 +20,45 @@ const COLORS = [
   "#538d4e",
 ];
 
-const WordleLoader = ({ visible = false, message = "Loading…" }) => {
+const MATCH_STATUS_MESSAGES = [
+  "Getting your match ready…",
+  "Setting up the match…",
+  "Match is starting, hang tight…",
+  "Preparing your match…",
+  "Loading match, almost there…",
+];
+
+const WordleLoader = ({
+  visible = false,
+  message,
+  splash = false,
+  hideMessage = false,
+}: {
+  visible?: boolean;
+  message?: string;
+  splash?: boolean;
+  hideMessage?: boolean;
+}) => {
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? "light"];
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  const statusMessages = useMemo(() => {
+    if (!message) {
+      return MATCH_STATUS_MESSAGES;
+    }
+
+    const trimmedMessage = String(message).trim();
+    if (!trimmedMessage) {
+      return MATCH_STATUS_MESSAGES;
+    }
+
+    return [
+      trimmedMessage,
+      ...MATCH_STATUS_MESSAGES.filter((item) => item !== trimmedMessage),
+    ];
+  }, [message]);
 
   const tileAnims = useRef(
     LETTERS.map(() => ({
@@ -36,6 +75,19 @@ const WordleLoader = ({ visible = false, message = "Loading…" }) => {
       useNativeDriver: true,
     }).start();
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible || hideMessage) {
+      setMessageIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % statusMessages.length);
+    }, 1800);
+
+    return () => clearInterval(interval);
+  }, [visible, statusMessages.length, hideMessage]);
 
   // Tile flip loop
   useEffect(() => {
@@ -79,7 +131,58 @@ const WordleLoader = ({ visible = false, message = "Loading…" }) => {
     return () => animations.forEach((a) => a.stop());
   }, [visible, tileAnims]);
 
+  const displayMessage =
+    statusMessages[messageIndex] || MATCH_STATUS_MESSAGES[0];
+
   if (!visible) return null;
+
+  const tiles = (
+    <View style={styles.tilesRow}>
+      {LETTERS.map((letter, i) => {
+        const { rotate, color } = tileAnims[i];
+
+        const rotateY = rotate.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["0deg", "90deg"],
+        });
+
+        const backgroundColor = color.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["#3a3a3c", COLORS[i]],
+        });
+
+        const borderColor = color.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["#565758", COLORS[i]],
+        });
+
+        return (
+          <Animated.View
+            key={i}
+            style={[
+              styles.tile,
+              { backgroundColor, borderColor, transform: [{ rotateY }] },
+            ]}
+          >
+            <Text style={styles.letter}>{letter}</Text>
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+
+  if (splash) {
+    return (
+      <Animated.View
+        style={[
+          styles.splashContainer,
+          { opacity: fadeAnim, backgroundColor: palette.gameBg },
+        ]}
+      >
+        {tiles}
+      </Animated.View>
+    );
+  }
 
   return (
     <Modal
@@ -88,42 +191,25 @@ const WordleLoader = ({ visible = false, message = "Loading…" }) => {
       animationType="none"
       statusBarTranslucent
     >
-      <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-        <View style={styles.card}>
-          <View style={styles.tilesRow}>
-            {LETTERS.map((letter, i) => {
-              const { rotate, color } = tileAnims[i];
+      <Animated.View
+        style={[
+          styles.overlay,
+          { opacity: fadeAnim, backgroundColor: palette.modalOverlay },
+        ]}
+      >
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: palette.card, borderColor: palette.border },
+          ]}
+        >
+          {tiles}
 
-              const rotateY = rotate.interpolate({
-                inputRange: [0, 1],
-                outputRange: ["0deg", "90deg"],
-              });
-
-              const backgroundColor = color.interpolate({
-                inputRange: [0, 1],
-                outputRange: ["#3a3a3c", COLORS[i]],
-              });
-
-              const borderColor = color.interpolate({
-                inputRange: [0, 1],
-                outputRange: ["#565758", COLORS[i]],
-              });
-
-              return (
-                <Animated.View
-                  key={i}
-                  style={[
-                    styles.tile,
-                    { backgroundColor, borderColor, transform: [{ rotateY }] },
-                  ]}
-                >
-                  <Text style={styles.letter}>{letter}</Text>
-                </Animated.View>
-              );
-            })}
-          </View>
-
-          <Text style={styles.message}>{message}</Text>
+          {hideMessage ? null : (
+            <Text style={[styles.message, { color: palette.mutedText }]}>
+              {displayMessage}
+            </Text>
+          )}
         </View>
       </Animated.View>
     </Modal>
@@ -131,20 +217,22 @@ const WordleLoader = ({ visible = false, message = "Loading…" }) => {
 };
 
 const styles = StyleSheet.create({
+  splashContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.75)",
     justifyContent: "center",
     alignItems: "center",
   },
   card: {
-    backgroundColor: "#1a1a1b",
     borderRadius: 18,
     paddingVertical: 30,
     paddingHorizontal: 24,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#3a3a3c",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -181,11 +269,10 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   message: {
-    color: "#818384",
     fontSize: 12,
     fontWeight: "600",
-    letterSpacing: 2,
-    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    textAlign: "center",
   },
 });
 

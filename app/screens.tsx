@@ -1,6 +1,6 @@
 import useAuth from "@/auth-protect/useAuth";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
 import { TouchableOpacity } from "react-native";
 import Toast from "react-native-toast-message";
@@ -68,14 +68,20 @@ export const Screens = () => {
 const AuthGate: React.FC = () => {
   const auth = useAuth();
   const segments = useSegments();
+  const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
+    if (auth.isLoading) {
+      return;
+    }
+
     const onAuth = auth.isAuthenticated;
 
     const onAuthRoutes = segments.length > 0 && segments[0] === "auth";
+    const onIndexRoute = pathname === "/" || pathname === "/index";
 
-    if (!onAuth && !onAuthRoutes) {
+    if (!onAuth && !onAuthRoutes && !onIndexRoute) {
       // Not authenticated and not on an auth page -> send to login
       router.replace("/auth/login");
     }
@@ -84,7 +90,7 @@ const AuthGate: React.FC = () => {
       // Authenticated but on auth routes -> send to play page
       router.replace("/play");
     }
-  }, [auth.isAuthenticated, segments.join("/")]);
+  }, [auth.isAuthenticated, auth.isLoading, pathname, segments.join("/")]);
 
   return null;
 };
