@@ -51,9 +51,7 @@ export default function PlayPage() {
   };
 
   const { data: statsData, loading: statsLoading } =
-    useFetch<GameStatsResponse>(
-      `${ENDPOINTS.GAME.GET_STATS}?userId=${auth.user?.id || ""}`,
-    );
+    useFetch<GameStatsResponse>(`${ENDPOINTS.GAME.GET_STATS}`);
 
   const profileName =
     statsData?.data?.username || auth.user?.username || "Player";
